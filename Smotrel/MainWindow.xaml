@@ -51,6 +51,7 @@
                 <Button Content="⏩ Ускорить" Click="BtnSpeedUp_Click" Margin="5" Padding="10,5" />
                 <Button Content="⏪ Норм. скорость" Click="BtnNormalSpeed_Click" Margin="5" Padding="10,5" />
                 <Button Content="⛶ Экран" Click="BtnFullscreen_Click" Margin="5" Padding="10,5" />
+                <Button Content="Выбрать папку" Click="BtnChooseFolder_Click" Margin="5" Padding="10,5"/>
                 <Button Content="Вперёд ▶" Click="BtnNext_Click" Margin="5" Padding="10,5" />
             </StackPanel>
         </Grid>

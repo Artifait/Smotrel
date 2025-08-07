@@ -178,14 +178,18 @@ namespace Smotrel
 
             return remaining;
         }
+        private void BtnChooseFolder_Click(object sender, RoutedEventArgs e)
+        {
+            ChooseFolderAndLoadVideos();
+        }
         private TimeSpan GetVideoDuration(string path)
         {
             try
             {
                 var shell = Microsoft.WindowsAPICodePack.Shell.ShellObject.FromParsingName(path);
                 var durationProp = shell.Properties.System.Media.Duration;
-                long durationIn100Ns = durationProp.Value ?? 0;
-                return TimeSpan.FromTicks(durationIn100Ns / 100);
+                ulong durationIn100Ns = durationProp.Value ?? 0;
+                return TimeSpan.FromTicks((long)(durationIn100Ns / 100));
             }
             catch
             {
