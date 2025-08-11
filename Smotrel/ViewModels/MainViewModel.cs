@@ -63,6 +63,17 @@ namespace Smotrel.ViewModels
             }
         }
 
+        public int SelectedIndex
+        {
+            get => _currentIndex;
+            set
+            {
+                if (value < 0 || value >= Playlist.Count)
+                    throw new ArgumentOutOfRangeException(nameof(value), "Index is out of range of the playlist.");
+                _currentIndex = value;
+                SelectedVideo = Playlist[_currentIndex];
+            }
+        }
         /// <summary>
         /// Путь для MediaElement.Source
         /// </summary>
@@ -192,6 +203,14 @@ namespace Smotrel.ViewModels
             }
         }
 
+        public void SetCurrentIndex(int index)
+        {
+            if (index < 0 || index >= Playlist.Count)
+                throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range of the playlist.");
+            _currentIndex = index;
+            SelectedVideo = Playlist[_currentIndex];
+            RaiseNavCommandsCanExecuteChanged();
+        }
         private bool CanMoveNext() => _currentIndex < Playlist.Count - 1;
         private bool CanMovePrevious() => _currentIndex > 0;
 

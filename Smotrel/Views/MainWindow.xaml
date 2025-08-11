@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vms="clr-namespace:Smotrel.ViewModels"
         Title="Smotrel Player" Height="600" Width="1000"
-        Background="#1E1E1E" Foreground="White">
+        Background="#1E1E1E" Foreground="White" Icon="/Views/Sprite-0001.ico">
 
     <Window.Resources>
         <!-- Кнопки -->
@@ -16,10 +16,34 @@
             <Setter Property="Margin" Value="5"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
-        <!-- Slider для seek/bar -->
+
         <Style TargetType="Slider">
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="#FFDD00"/>
             <Setter Property="Background" Value="#333"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge"
+                                                  Background="#FFDD00"
+                                                  Height="4" Margin="0"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="12" Height="12" Background="#FFDD00" BorderBrush="Black" BorderThickness="1"/>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge"
+                                                  Background="#333"
+                                                  Height="4" Margin="0"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -50,7 +74,7 @@
             </TreeView>
 
             <ListBox ItemsSource="{Binding Playlist}"
-                     SelectedItem="{Binding SelectedVideo}"
+                     SelectedIndex="{Binding SelectedIndex}"
                      DisplayMemberPath="Title"
                      Background="#2A2A2A" Foreground="White"
                      Height="400"/>
@@ -58,12 +82,12 @@
 
         <!-- Правая панель: плеер с оверлеем -->
         <Grid Grid.Column="1" Margin="5">
-            <!-- контейнер для Media + оверлея -->
             <Grid x:Name="PlayerContainer"
                   MouseEnter="PlayerContainer_MouseEnter"
                   MouseLeave="PlayerContainer_MouseLeave"
                   MouseMove="PlayerContainer_MouseMove"
                   SizeChanged="PlayerContainer_SizeChanged">
+
                 <!-- Видео -->
                 <MediaElement x:Name="Player"
                               Source="{Binding CurrentVideoPath}"
@@ -73,50 +97,84 @@
                               MouseLeftButtonDown="Player_MouseLeftButtonDown"
                               MediaOpened="Player_MediaOpened"/>
 
-                <!-- Overlay controls -->
+                <!-- Оверлей на весь экран видео -->
                 <Grid x:Name="ControlOverlay"
-                      VerticalAlignment="Bottom"
-                      Background="#80000000"
-                      Height="80"
+                      Background="#40000000"
                       Opacity="1"
-                      Margin="0"
-                      Visibility="Visible">
+                      Visibility="Visible"
+                      IsHitTestVisible="True">
 
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <!-- Верхняя панель -->
+                        <RowDefinition Height="*"/>
+                        <!-- Центр -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Нижняя панель -->
                     </Grid.RowDefinitions>
 
-                    <!-- Прозрачная верхняя зона: ловит клик, но не перекрывает кнопки -->
-                    <Border Grid.Row="0"
-            Background="Transparent"
-            MouseLeftButtonDown="Player_MouseLeftButtonDown" />
+                    <!-- Верх: название видео -->
+                    <Border Background="#80000000" Padding="10">
+                        <TextBlock Text="{Binding CurrentVideoPath}"
+                                   FontSize="18"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                    </Border>
 
-                    <!-- Панель с контролами -->
-                    <StackPanel Grid.Row="1"
-                Orientation="Vertical"
-                Margin="20"
-                IsHitTestVisible="True">
+                    <!-- Центр — кликабельная зона -->
+                    <Border Grid.Row="1"
+                            Background="Transparent"
+                            MouseLeftButtonDown="Player_MouseLeftButtonDown"/>
+
+                    <!-- Большой центрированный индикатор (Play / Pause) -->
+                    <TextBlock x:Name="centerIcon"
+                               Grid.Row="1"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="96"
+                               FontWeight="Bold"
+                               Opacity="0"
+                               Visibility="Collapsed"
+                               IsHitTestVisible="False"
+                               Text="▶">
+                        <TextBlock.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
+
+                    <!-- Низ: панель управления -->
+                    <StackPanel Grid.Row="2"
+                                Orientation="Vertical"
+                                Background="#80000000"
+                                Margin="0"
+                                IsHitTestVisible="True">
+
                         <!-- Слайдер времени -->
                         <Slider x:Name="videoSlider"
-                Minimum="0"
-                Maximum="100"
-                ValueChanged="videoSlider_ValueChanged"
-                PreviewMouseDown="Slider_PreviewMouseDown"
-                PreviewMouseUp="Slider_PreviewMouseUp"/>
+                                Minimum="0"
+                                Maximum="100"
+                                ValueChanged="videoSlider_ValueChanged"
+                                PreviewMouseDown="Slider_PreviewMouseDown"
+                                PreviewMouseUp="Slider_PreviewMouseUp"/>
 
-                        <!-- Иконки управления -->
+                        <!-- Кнопки -->
                         <StackPanel Orientation="Horizontal"
-                    HorizontalAlignment="Center"
-                    Margin="0,10,0,0">
+                                    HorizontalAlignment="Center"
+                                    Margin="0,5,0,0">
                             <Button Command="{Binding PrevCommand}" Content="⏮"/>
-                            <Button Command="{Binding PausePlayCommand}" Content="⏯"/>
+                            <!-- Даём имя, чтобы менять Content в code-behind, но сохраняем Command -->
+                            <Button x:Name="btnPausePlay" Command="{Binding PausePlayCommand}" Content="⏸"/>
                             <Button Command="{Binding NextCommand}" Content="⏭"/>
 
-                            <!-- Volume placeholder -->
-                            <StackPanel Orientation="Horizontal" Margin="20,0">
-                                <TextBlock Text="▬" FontSize="20"/>
-                                <Ellipse Width="8" Height="8" Fill="White" Margin="-4,0"/>
+                            <!-- Volume -->
+                            <StackPanel Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center">
+                                <TextBlock Text="🔊" FontSize="18" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <Slider x:Name="volumeSlider"
+                        Minimum="0"
+                        Maximum="1"
+                        Value="0.5"
+                        Width="100"
+                        ValueChanged="volumeSlider_ValueChanged"/>
                             </StackPanel>
 
                             <Button Command="{Binding FullscreenCommand}" Content="⛶"/>
