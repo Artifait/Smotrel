@@ -115,7 +115,7 @@
 
                     <!-- Верх: название видео -->
                     <Border Background="#80000000" Padding="10">
-                        <TextBlock Text="{Binding CurrentVideoPath}"
+                        <TextBlock Text="{Binding CurrentVideoTitle}"
                                    FontSize="18"
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center"/>
@@ -142,6 +142,32 @@
                         </TextBlock.RenderTransform>
                     </TextBlock>
 
+                    <!-- Resume banner (initially collapsed) -->
+                    <StackPanel x:Name="ResumeBanner"
+                                Grid.Row="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,10,0"
+                                Visibility="Collapsed">
+                        <Border Background="#AA111111" Padding="8" CornerRadius="6">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="ResumeText"
+                                           Text="Продолжить с 0:00?"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"
+                                           FontSize="14"/>
+                                <Button x:Name="BtnResume"
+                                        Click="BtnResume_Click"
+                                        Content="▶ Продолжить"
+                                        Margin="0,0,6,0"/>
+                                <Button x:Name="BtnClearResume"
+                                        Click="BtnClearResume_Click"
+                                        Content="✖ Сбросить"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                    
                     <!-- Низ: панель управления -->
                     <StackPanel Grid.Row="2"
                                 Orientation="Vertical"
@@ -186,11 +212,11 @@
                             <StackPanel Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center">
                                 <TextBlock Text="🔊" FontSize="18" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                 <Slider x:Name="volumeSlider"
-                        Minimum="0"
-                        Maximum="1"
-                        Value="0.5"
-                        Width="100"
-                        ValueChanged="volumeSlider_ValueChanged"/>
+                                        Minimum="0"
+                                        Maximum="1"
+                                        Value="0.5"
+                                        Width="100"
+                                        ValueChanged="volumeSlider_ValueChanged"/>
                             </StackPanel>
 
                             <Button Command="{Binding FullscreenCommand}" Content="⛶"/>

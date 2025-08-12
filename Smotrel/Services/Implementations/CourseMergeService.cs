@@ -4,8 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Smotrel.Data.Entities;
+using Smotrel.Services.Interfaces;
 
-namespace Smotrel.Services
+namespace Smotrel.Services.Implementations
 {
     public enum MatchKind
     {
@@ -235,8 +236,8 @@ namespace Smotrel.Services
 
         private static bool IsAlreadyMatched(MergeResult res, PartEntity newPart)
         {
-            return res.Matches.Any(m => (m.NewPartId.HasValue && m.NewPartId.Value == newPart.Id)
-                                     || (!string.IsNullOrWhiteSpace(m.NewPath) && NormalizePath(m.NewPath) == NormalizePath(newPart.Path)));
+            return res.Matches.Any(m => m.NewPartId.HasValue && m.NewPartId.Value == newPart.Id
+                                     || !string.IsNullOrWhiteSpace(m.NewPath) && NormalizePath(m.NewPath) == NormalizePath(newPart.Path));
         }
 
         private static void ApplyMatch(PartEntity existing, PartEntity targetNew)

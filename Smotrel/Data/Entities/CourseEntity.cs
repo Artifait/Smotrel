@@ -22,6 +22,9 @@ namespace Smotrel.Data.Entities
         public string Status { get; set; } = "inprogress";
 
         public List<ChapterEntity> Chapters { get; set; } = new();
+
+        public Guid? LastPlayedPartId { get; set; }
+        public long LastPlayedPositionSeconds { get; set; } = 0;
     }
 
     public class ChapterEntity

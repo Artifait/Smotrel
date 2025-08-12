@@ -1,32 +1,21 @@
-﻿using System;
+﻿
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Smotrel.Data.Entities;
+using Smotrel.Services.Interfaces;
 
-namespace Smotrel.Services
+namespace Smotrel.Services.Implementations
 {
-    /// <summary>
-    /// PlaybackService:
-    /// - буферизует обновления позиции по частям (debounce)
-    /// - при Flush сохраняет все pending изменения в репозиторий
-    /// - можно сразу сохранять по partId / помечать watched
-    /// </summary>
     public class PlaybackService : IPlaybackService, IDisposable
     {
         private readonly ICourseRepository _repo;
         private readonly ILogger<PlaybackService>? _logger;
         private readonly TimeSpan _debounceDelay = TimeSpan.FromSeconds(2);
 
-        // pending per courseRoot -> state
+        // pending resume markers per course root
         private readonly ConcurrentDictionary<string, PendingState> _pending = new(StringComparer.OrdinalIgnoreCase);
-
-        // for disposing
-        private bool _disposed;
+        private bool _disposed = false;
 
         public PlaybackService(ICourseRepository repo, ILogger<PlaybackService>? logger = null)
         {
@@ -41,17 +30,14 @@ namespace Smotrel.Services
             var courseRoot = FindCourseRootForFile(filePath);
             if (courseRoot == null) return;
 
-            // try to find part id quickly by loading course (could be optimized by caching)
             var course = await _repo.LoadAsync(courseRoot);
             if (course == null) return;
 
-            var part = course.Chapters.SelectMany(ch => ch.Parts)
+            var part = course.Chapters.SelectMany(c => c.Parts)
                                       .FirstOrDefault(p => string.Equals(NormalizePath(p.Path), NormalizePath(filePath), StringComparison.OrdinalIgnoreCase));
             if (part == null) return;
 
-            EnqueuePendingPosition(courseRoot, part.Id, seconds);
-
-            // schedule a delayed flush for this course
+            EnqueueResume(courseRoot, part.Id, seconds);
             ScheduleFlush(courseRoot);
         }
 
@@ -62,12 +48,18 @@ namespace Smotrel.Services
             var course = await _repo.LoadAsync(courseRootPath);
             if (course == null) return;
 
-            var part = course.Chapters.SelectMany(ch => ch.Parts).FirstOrDefault(p => p.Id == partId);
-            if (part == null) return;
+            // set course-level resume marker
+            course.LastPlayedPartId = partId;
+            course.LastPlayedPositionSeconds = seconds;
 
-            part.LastPositionSeconds = seconds;
-            if (part.DurationSeconds.HasValue && seconds >= Math.Round(part.DurationSeconds.Value * 0.95))
-                part.Watched = true;
+            // optionally update per-part LastPositionSeconds for compatibility (not required)
+            var part = course.Chapters.SelectMany(ch => ch.Parts).FirstOrDefault(p => p.Id == partId);
+            if (part != null)
+            {
+                part.LastPositionSeconds = seconds;
+                if (part.DurationSeconds.HasValue && seconds >= Math.Round(part.DurationSeconds.Value * 0.95))
+                    part.Watched = true;
+            }
 
             RecalculateMetaWatchedSeconds(course);
 
@@ -87,10 +79,28 @@ namespace Smotrel.Services
             part.Watched = true;
             if (part.DurationSeconds.HasValue)
                 part.LastPositionSeconds = Math.Max(part.LastPositionSeconds, part.DurationSeconds.Value);
-            else
-                part.LastPositionSeconds = part.LastPositionSeconds; // leave as is
 
             RecalculateMetaWatchedSeconds(course);
+
+            // If this part was the resume marker and was fully watched, clear the resume marker
+            if (course.LastPlayedPartId.HasValue && course.LastPlayedPartId.Value == partId)
+            {
+                course.LastPlayedPartId = null;
+                course.LastPlayedPositionSeconds = 0;
+            }
+
+            await SafeSaveAsync(courseRootPath, course);
+        }
+
+        public async Task ClearResumeAsync(string courseRootPath)
+        {
+            if (string.IsNullOrWhiteSpace(courseRootPath)) throw new ArgumentNullException(nameof(courseRootPath));
+
+            var course = await _repo.LoadAsync(courseRootPath);
+            if (course == null) return;
+
+            course.LastPlayedPartId = null;
+            course.LastPlayedPositionSeconds = 0;
 
             await SafeSaveAsync(courseRootPath, course);
         }
@@ -106,37 +116,28 @@ namespace Smotrel.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "Error flushing pending playback for {root}", key);
+                    _logger?.LogError(ex, "Error flushing pending resume for {root}", key);
                 }
             }
         }
 
-        // ---------------- helpers ----------------
-
-        private void EnqueuePendingPosition(string courseRoot, Guid partId, long seconds)
+        private void EnqueueResume(string courseRoot, Guid partId, long seconds)
         {
             var state = _pending.GetOrAdd(courseRoot, _ => new PendingState());
-
             lock (state.Sync)
             {
-                state.Positions[partId] = seconds;
-                _logger?.LogDebug("Enqueued position {s} for part {p} (course {c})", seconds, partId, courseRoot);
+                state.ResumeMarker = (partId, seconds);
             }
         }
 
         private void ScheduleFlush(string courseRoot)
         {
             var state = _pending.GetOrAdd(courseRoot, _ => new PendingState());
-
             lock (state.Sync)
             {
-                // cancel previous scheduled task (if any)
                 state.CancelScheduled();
-
                 state.Cts = new CancellationTokenSource();
                 var token = state.Cts.Token;
-
-                // schedule a task that waits debounce then flushes
                 state.ScheduledTask = Task.Run(async () =>
                 {
                     try
@@ -144,13 +145,10 @@ namespace Smotrel.Services
                         await Task.Delay(_debounceDelay, token);
                         await FlushCoursePendingAsync(courseRoot);
                     }
-                    catch (OperationCanceledException)
-                    {
-                        // expected on reschedule
-                    }
+                    catch (OperationCanceledException) { }
                     catch (Exception ex)
                     {
-                        _logger?.LogError(ex, "Error during scheduled flush for {root}", courseRoot);
+                        _logger?.LogError(ex, "Scheduled flush exception for {root}", courseRoot);
                     }
                 }, token);
             }
@@ -160,47 +158,30 @@ namespace Smotrel.Services
         {
             if (!_pending.TryGetValue(courseRoot, out var state)) return;
 
-            KeyValuePair<Guid, long>[] items;
+            (Guid partId, long pos)? marker;
             lock (state.Sync)
             {
-                if (state.Positions.Count == 0) return;
-                items = state.Positions.ToArray();
-                state.Positions.Clear();
-                state.CancelScheduled(); // cancel scheduled as we're executing now
+                marker = state.ResumeMarker;
+                state.ResumeMarker = null;
+                state.CancelScheduled();
             }
 
-            // safe save: load course, apply updates, save
+            if (!marker.HasValue) return;
+
             var course = await _repo.LoadAsync(courseRoot);
             if (course == null) return;
 
-            var parts = course.Chapters.SelectMany(ch => ch.Parts).ToDictionary(p => p.Id, p => p);
-            bool changed = false;
+            course.LastPlayedPartId = marker.Value.partId;
+            course.LastPlayedPositionSeconds = marker.Value.pos;
 
-            foreach (var kv in items)
-            {
-                if (parts.TryGetValue(kv.Key, out var part))
-                {
-                    var seconds = kv.Value;
-                    if (seconds != part.LastPositionSeconds)
-                    {
-                        part.LastPositionSeconds = seconds;
-                        changed = true;
-                    }
+            // optionally update part's LastPositionSeconds for compatibility
+            var part = course.Chapters.SelectMany(ch => ch.Parts).FirstOrDefault(p => p.Id == marker.Value.partId);
+            if (part != null)
+                part.LastPositionSeconds = marker.Value.pos;
 
-                    if (part.DurationSeconds.HasValue && seconds >= Math.Round(part.DurationSeconds.Value * 0.95))
-                        part.Watched = true;
-                }
-                else
-                {
-                    _logger?.LogWarning("Pending part {p} not found in course {c} during flush", kv.Key, courseRoot);
-                }
-            }
+            RecalculateMetaWatchedSeconds(course);
 
-            if (changed)
-            {
-                RecalculateMetaWatchedSeconds(course);
-                await SafeSaveAsync(courseRoot, course);
-            }
+            await SafeSaveAsync(courseRoot, course);
         }
 
         private void RecalculateMetaWatchedSeconds(CourseEntity course)
@@ -220,9 +201,7 @@ namespace Smotrel.Services
         {
             try
             {
-                // Optional: make backup before saving if you want; repo may do it.
                 await _repo.SaveAsync(course);
-                _logger?.LogDebug("Saved playback positions for course {root}", courseRootPath);
             }
             catch (Exception ex)
             {
@@ -235,19 +214,15 @@ namespace Smotrel.Services
             try
             {
                 var fi = new FileInfo(filePath);
-                var dir = fi.Exists ? fi.Directory : new FileInfo(filePath).Directory;
-                if (dir == null) return null;
-
+                var dir = fi.Exists ? fi.Directory : new DirectoryInfo(filePath).Parent;
                 var current = dir;
                 while (current != null)
                 {
                     var candidate = Path.Combine(current.FullName, ".smotrel");
                     if (Directory.Exists(candidate))
                         return current.FullName;
-
                     current = current.Parent;
                 }
-
                 return null;
             }
             catch
@@ -273,21 +248,17 @@ namespace Smotrel.Services
         {
             if (_disposed) return;
             _disposed = true;
-
-            foreach (var kv in _pending)
-                kv.Value.CancelScheduled();
-
+            foreach (var kv in _pending) kv.Value.CancelScheduled();
             _pending.Clear();
         }
 
-        // ---------------- internal types ----------------
+        // pending state
         private class PendingState
         {
-            public readonly Dictionary<Guid, long> Positions = new();
+            public (Guid partId, long pos)? ResumeMarker;
             public CancellationTokenSource? Cts;
             public Task? ScheduledTask;
             public readonly object Sync = new();
-
             public void CancelScheduled()
             {
                 try
@@ -298,7 +269,7 @@ namespace Smotrel.Services
                         Cts.Dispose();
                     }
                 }
-                catch { /*ignore*/ }
+                catch { }
                 Cts = null;
                 ScheduledTask = null;
             }

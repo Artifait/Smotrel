@@ -1,8 +1,7 @@
-﻿
-using Smotrel.Data.Entities;
+﻿using Smotrel.Data.Entities;
 using Smotrel.Models.Course;
 
-namespace Smotrel.Services
+namespace Smotrel.Services.Interfaces
 {
     public interface ICourseRepository
     {

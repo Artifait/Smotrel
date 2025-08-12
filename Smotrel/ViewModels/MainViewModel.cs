@@ -11,7 +11,7 @@ using Smotrel.Data.Entities;
 using Smotrel.Helpers;
 using Smotrel.Messages;
 using Smotrel.Models;
-using Smotrel.Services;
+using Smotrel.Services.Interfaces;
 
 namespace Smotrel.ViewModels
 {
@@ -64,15 +64,44 @@ namespace Smotrel.ViewModels
                     _selectedVideo = value;
                     OnPropertyChanged(nameof(SelectedVideo));
                     OnPropertyChanged(nameof(CurrentVideoPath));
+                    OnPropertyChanged(nameof(CurrentVideoTitle));
 
                     if (_selectedVideo != null)
                     {
                         // При изменении выбранного — отправляем сообщение о воспроизведении
                         WeakReferenceMessenger.Default.Send(new PlayVideoMessage(_selectedVideo.FilePath));
+
+                        // Асинхронно проверяем, есть ли resume-маркер курса для этой части
+                        _ = CheckAndNotifyResumeForSelectedAsync();
                     }
                 }
             }
         }
+
+        private async Task CheckAndNotifyResumeForSelectedAsync()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(CourseRootPath) || SelectedVideo == null || string.IsNullOrWhiteSpace(SelectedVideo.PartId))
+                    return;
+
+                if (!Guid.TryParse(SelectedVideo.PartId, out var pid)) return;
+
+                var course = await _repository.LoadAsync(CourseRootPath);
+                if (course == null) return;
+
+                if (course.LastPlayedPartId.HasValue && course.LastPlayedPartId.Value == pid && course.LastPlayedPositionSeconds > 0)
+                {
+                    // отправляем сообщение для UI (MainWindow подпишется)
+                    WeakReferenceMessenger.Default.Send(new ResumeAvailableMessage(pid, course.LastPlayedPositionSeconds, CourseRootPath));
+                }
+            }
+            catch
+            {
+                // best-effort — игнорируем ошибки проверки resume
+            }
+        }
+
 
         public int SelectedIndex
         {
@@ -91,6 +120,8 @@ namespace Smotrel.ViewModels
         /// </summary>
         public string? CurrentVideoPath => SelectedVideo?.FilePath;
 
+        public string? CurrentVideoTitle => SelectedVideo?.Title;
+
         // Команды
         public ICommand BrowseCommand { get; }
         public ICommand PrevCommand { get; }
@@ -104,8 +135,7 @@ namespace Smotrel.ViewModels
             ICourseScanner scanner,
             ICourseRepository repository,
             ICourseMergeService mergeService,
-            IPlaybackService playbackService,
-            IVideoLibraryService? legacyLibraryService = null) // legacy optional
+            IPlaybackService playbackService)
         {
             _scanner = scanner ?? throw new ArgumentNullException(nameof(scanner));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -148,7 +178,7 @@ namespace Smotrel.ViewModels
         }
 
         /// <summary>
-        /// Загрузка всей структуры: сканируем папку, загружаем/сливаем с БД и строим UI-дерево/плейлист
+        /// Загрузка всей структуры: сканируем папку, загружаем/сливаем с репозиторием (JSON), строим UI-дерево/плейлист
         /// </summary>
         private async Task LoadLibraryAsync()
         {
@@ -157,16 +187,16 @@ namespace Smotrel.ViewModels
                 return;
 
             var rootPath = dlg.SelectedPath;
+
             // 1) Сканируем (получим свежую структуру и fsHash)
-            CourseEntity scanned = null!;
+            CourseEntity scanned;
             try
             {
                 scanned = await _scanner.ScanAsync(rootPath, tryGetDurations: true);
             }
             catch (Exception ex)
             {
-                // TODO: логирование / показать пользователю
-                // fallback: пока используем legacy library service? но лучше уведомить
+                // TODO: показать пользователю понятное сообщение, сейчас пробрасываем
                 throw new InvalidOperationException("Scan failed: " + ex.Message, ex);
             }
 
@@ -178,10 +208,10 @@ namespace Smotrel.ViewModels
             }
             catch
             {
-                // ignore, treat as no existing
                 existing = null;
             }
 
+            // 3) Решаем, что сохранять (new / keep existing / merge)
             CourseEntity toSave;
             if (existing == null)
             {
@@ -189,43 +219,69 @@ namespace Smotrel.ViewModels
             }
             else
             {
-                // если hash совпадает — можем использовать existing (чтобы сохранить user-updated fields)
+                // если hash совпадает — оставляем existing (с обновлением метаданных)
                 if (!string.IsNullOrWhiteSpace(existing.FsHash) &&
                     !string.IsNullOrWhiteSpace(scanned.FsHash) &&
                     string.Equals(existing.FsHash, scanned.FsHash, StringComparison.OrdinalIgnoreCase))
                 {
-                    // обновим lastScanned etc.
                     existing.LastScannedAt = DateTime.UtcNow;
                     existing.TotalDurationSeconds = scanned.TotalDurationSeconds ?? existing.TotalDurationSeconds;
+                    // preserve user fields (LastPlayedPartId и т.п.)
                     toSave = existing;
                 }
                 else
                 {
-                    // merge existing -> scanned
+                    // merge existing + scanned
                     var mergeResult = _mergeService.Merge(existing, scanned);
-                    // backup old DB/json
+                    // backup current JSON (если есть)
                     await _repository.BackupAsync(rootPath, "merge-before-save");
                     toSave = mergeResult.MergedCourse;
                 }
             }
 
-            // 3) Сохраняем merged/new into repository
+            // 4) Сохраняем (atomic save в .smotrel/course.json)
             await _repository.SaveAsync(toSave);
 
-            // 4) Построим TreeView root и Playlist из toSave
-            CourseRootPath = toSave.RootPath;
+            // 5) Построим UI из toSave
+            CourseRootPath = toSave.RootPath; // важно — для Resume проверок
             Root = BuildFolderNodeFromCourse(toSave);
             PopulatePlaylistFromCourse(toSave);
 
-            // 5) Автозапуск первого видео если есть
+            // 6) Выбор видео для автозапуска:
+            //    Если есть курс-маркер LastPlayedPartId — выбрать именно ту часть (resume).
+            //    Если не найден (файл удалён/переименован), fallback: выбрать первый элемент (если есть).
             if (Playlist.Any())
             {
-                _currentIndex = 0;
-                SelectedVideo = Playlist[0];
+                bool selected = false;
+
+                if (toSave.LastPlayedPartId.HasValue)
+                {
+                    var pid = toSave.LastPlayedPartId.Value;
+                    var matchIndex = Playlist.ToList().FindIndex(v =>
+                        !string.IsNullOrWhiteSpace(v.PartId) &&
+                        Guid.TryParse(v.PartId, out var g) &&
+                        g == pid);
+
+                    if (matchIndex >= 0)
+                    {
+                        _currentIndex = matchIndex;
+                        SelectedVideo = Playlist[_currentIndex];
+                        selected = true;
+                    }
+                }
+
+                if (!selected)
+                {
+                    // fallback: pick first element
+                    _currentIndex = 0;
+                    SelectedVideo = Playlist[0];
+                }
             }
 
             RaiseNavCommandsCanExecuteChanged();
         }
+
+
 
         /// <summary>
         /// Заполнить плейлист всем видео из CourseEntity (в порядке глав -> частей)

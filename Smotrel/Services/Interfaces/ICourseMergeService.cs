@@ -1,7 +1,7 @@
-﻿
-using Smotrel.Data.Entities;
+﻿using Smotrel.Data.Entities;
+using Smotrel.Services.Implementations;
 
-namespace Smotrel.Services
+namespace Smotrel.Services.Interfaces
 {
     public interface ICourseMergeService
     {

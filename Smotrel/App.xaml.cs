@@ -1,6 +1,7 @@
 ﻿
 using Microsoft.Extensions.DependencyInjection;
-using Smotrel.Services;
+using Smotrel.Services.Implementations;
+using Smotrel.Services.Interfaces;
 using Smotrel.ViewModels;
 using Smotrel.Views;
 using System.Windows;
@@ -29,9 +30,8 @@ namespace Smotrel
         {
             services.AddSingleton<ICourseScanner, CourseScanner>();
             services.AddSingleton<ICourseMergeService, CourseMergeService>();
-            services.AddSingleton<ICourseRepository, EfCourseRepository>();
+            services.AddSingleton<ICourseRepository, CourseJsonRepository>();
             services.AddSingleton<IPlaybackService, PlaybackService>();
-            services.AddSingleton<IVideoLibraryService, FileSystemVideoLibraryService>();
 
             services.AddSingleton<MainViewModel>(); // <- важно
             services.AddSingleton<MainWindow>();
