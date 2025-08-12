@@ -149,13 +149,29 @@
                                 Margin="0"
                                 IsHitTestVisible="True">
 
-                        <!-- Слайдер времени -->
-                        <Slider x:Name="videoSlider"
-                                Minimum="0"
-                                Maximum="100"
-                                ValueChanged="videoSlider_ValueChanged"
-                                PreviewMouseDown="Slider_PreviewMouseDown"
-                                PreviewMouseUp="Slider_PreviewMouseUp"/>
+                        <!-- Слайдер времени + время текущего / общей длительности -->
+                        <Grid Margin="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Slider x:Name="videoSlider"
+                                    Grid.Column="0"
+                                    Minimum="0"
+                                    Maximum="100"
+                                    ValueChanged="videoSlider_ValueChanged"
+                                    PreviewMouseDown="Slider_PreviewMouseDown"
+                                    PreviewMouseUp="Slider_PreviewMouseUp"/>
+
+                            <!-- Время: Current / Total -->
+                            <TextBlock x:Name="timeText"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0"
+                                       FontSize="14"
+                                       Text="0:00 / 0:00"/>
+                        </Grid>
 
                         <!-- Кнопки -->
                         <StackPanel Orientation="Horizontal"

@@ -10,73 +10,69 @@ using Smotrel.ViewModels;
 using System.Windows.Media.Animation;
 
 using Point = System.Windows.Point;
+using System.Windows.Media.Effects;
 
 namespace Smotrel.Views
 {
     public partial class MainWindow : Window
     {
         private readonly DispatcherTimer _overlayTimer;
-        private readonly TimeSpan _overlayTimeout = TimeSpan.FromSeconds(1); // из настроек
+        private readonly TimeSpan _overlayTimeout = TimeSpan.FromSeconds(1);
 
         private readonly MainViewModel _vm;
+        private readonly IPlaybackService _playbackService;
+
         private bool _isSeeking = false;
         private bool _isPlaying = true;
         private bool _isFullscreen = false;
 
-        // Таймер для центрального индикатора
         private readonly DispatcherTimer _centerIconTimer;
+        private bool _keepOverlayVisibleWhenPaused = true;
+        private bool _forceShowOverlayWhenPausing = true;
 
-        private bool _keepOverlayVisibleWhenPaused = true;        // = true -> при паузе оверлей не должен прятаться
-        private bool _forceShowOverlayWhenPausing = true;         // = true -> при переключении Play->Pause делать мгновенный show overlay перед анимацией центра
+        // для сохранения прогресса
+        private Guid? _currentPartId = null;
+        private int _lastNotifiedSecond = -1;
 
-        public MainWindow()
+        public MainWindow(MainViewModel vm, IPlaybackService playbackService)
         {
             InitializeComponent();
 
-            var videoSvc = new FileSystemVideoLibraryService();
-            _vm = new MainViewModel(videoSvc);
+            _vm = vm ?? throw new ArgumentNullException(nameof(vm));
+            _playbackService = playbackService ?? throw new ArgumentNullException(nameof(playbackService));
+
             DataContext = _vm;
 
             _vm.PropertyChanged += Vm_PropertyChanged;
 
             WeakReferenceMessenger.Default.Register<VideoControlMessage>(this, HandleVideoControl);
 
-            // Обновлять слайдер каждый кадр
             CompositionTarget.Rendering += UpdateSliderPosition;
 
-            // Когда видео загружено — устанавливаем длительность
+            // MediaOpened подписка (уже была)
             Player.MediaOpened += Player_MediaOpened;
+            Player.MediaEnded += Player_MediaEnded; // добавляем обработчик окончания
 
-            // инициализируем таймер
-            _overlayTimer = new DispatcherTimer
-            {
-                Interval = _overlayTimeout
-            };
-            _overlayTimer.Tick += (s, e) => {
-                HideOverlay();
-            };
+            _overlayTimer = new DispatcherTimer { Interval = _overlayTimeout };
+            _overlayTimer.Tick += (s, e) => HideOverlay();
 
-            // Центральный индикатор (показывать кратко при паузе/воспроизведении)
-            _centerIconTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(700)
-            };
+            _centerIconTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
             _centerIconTimer.Tick += (s, e) =>
             {
                 _centerIconTimer.Stop();
-                // плавно скрываем
                 var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(200));
                 fadeOut.Completed += (_, __) => centerIcon.Visibility = Visibility.Collapsed;
                 centerIcon.BeginAnimation(OpacityProperty, fadeOut);
             };
 
-            volumeSlider.Value = 0.5; // стартовая громкость 50%
+            volumeSlider.Value = 0.5;
             Player.Volume = 0.5;
-
-            // Устанавливаем начальное состояние кнопки воспроизведения
             UpdatePlayButton();
+
+            this.Closing += MainWindow_Closing;
         }
 
+        // при смене свойств ViewModel — отслеживаем SelectedVideo и CurrentVideoPath
         private void Vm_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(_vm.CurrentVideoPath)
@@ -87,8 +83,40 @@ namespace Smotrel.Views
                 Player.Play();
                 _isPlaying = true;
                 UpdatePlayButton();
-                // Покажем краткую подсказку что видео запущено
                 ShowCenterFeedback(_isPlaying);
+            }
+
+            if (e.PropertyName == nameof(_vm.SelectedVideo))
+            {
+                // получили новую выбранную VideoItem — установим current part id и попытаемся восстановить позицию
+                var selected = _vm.SelectedVideo;
+                if (selected != null)
+                {
+                    // предполагается, что VideoItem содержит PartId и Duration (из Course)
+                    if (Guid.TryParse(selected.PartId ?? "", out var gid))
+                        _currentPartId = gid;
+                    else
+                        _currentPartId = null;
+
+                    // Если есть сохранённая позиция — запомним и поставим плеер в это место, когда MediaOpened произойдёт.
+                    // Здесь можно сразу установить, если MediaElement уже загружен и имеет длительность.
+                    if (selected.LastPosition > 0)
+                    {
+                        try
+                        {
+                            // Отложим положение, если медиа не открыто — при MediaOpened позиция установится ещё раз.
+                            Player.Position = TimeSpan.FromSeconds(selected.LastPosition);
+                        }
+                        catch { /* ignore */ }
+                    }
+
+                    // обновим timeText на основе known duration
+                    UpdateTimeText();
+                }
+                else
+                {
+                    _currentPartId = null;
+                }
             }
         }
 
@@ -99,15 +127,132 @@ namespace Smotrel.Views
                 videoSlider.Minimum = 0;
                 videoSlider.Maximum = Player.NaturalDuration.TimeSpan.TotalSeconds;
             }
-            // После открытия можно подстроить overlay под видео
+            else
+            {
+                // если NaturalDuration не доступна — попытаться взять длительность из SelectedVideo (metadata)
+                if (_vm.SelectedVideo?.Duration is long dur && dur > 0)
+                {
+                    videoSlider.Minimum = 0;
+                    videoSlider.Maximum = dur;
+                }
+            }
+
+            // Если SelectedVideo имеет LastPosition (resume) — сразу встанем туда
+            if (_vm.SelectedVideo?.LastPosition > 0)
+            {
+                var pos = TimeSpan.FromSeconds(_vm.SelectedVideo.LastPosition);
+                // защитимся от выхода за пределы (если Slider.Maximum меньше)
+                if (playerPositionWithinBounds(pos))
+                    Player.Position = pos;
+            }
+
             AdjustOverlaySize();
+            UpdateTimeText();
+        }
+
+        private void Player_MediaEnded(object sender, RoutedEventArgs e)
+        {
+            // при достижении конца — отмечаем watched и сохраняем
+            if (_currentPartId.HasValue && _vm.SelectedVideo != null)
+            {
+                // На всякий случай: пометим watched в background
+                _ = _playbackService.MarkWatchedByPartIdAsync(_vm.CourseRootPath!, _currentPartId.Value);
+            }
+        }
+
+        private bool playerPositionWithinBounds(TimeSpan pos)
+        {
+            if (Player.NaturalDuration.HasTimeSpan)
+            {
+                return pos <= Player.NaturalDuration.TimeSpan;
+            }
+            if (_vm.SelectedVideo?.Duration is long d && d > 0)
+            {
+                return pos.TotalSeconds <= d;
+            }
+            return true;
         }
 
         private void UpdateSliderPosition(object sender, EventArgs e)
         {
-            if (!_isSeeking && Player.NaturalDuration.HasTimeSpan)
+            if (!_isSeeking)
             {
-                videoSlider.Value = Player.Position.TotalSeconds;
+                if (Player.NaturalDuration.HasTimeSpan)
+                {
+                    videoSlider.Value = Player.Position.TotalSeconds;
+                }
+                else
+                {
+                    // если NaturalDuration не доступна, но slider.Maximum установлен из metadata
+                    videoSlider.Value = Player.Position.TotalSeconds;
+                }
+
+                // Обновлять текст времени
+                UpdateTimeText();
+
+                // и отправлять позицию в playbackService по целым секундам (чтобы не спамить)
+                var currentSec = (int)Math.Floor(Player.Position.TotalSeconds);
+                if (currentSec != _lastNotifiedSecond)
+                {
+                    _lastNotifiedSecond = currentSec;
+                    // вызываем без await — service дебаунсит и буферизует
+                    if (!string.IsNullOrWhiteSpace(_vm.SelectedVideo?.FilePath))
+                    {
+                        _ = _playbackService.NotifyPositionAsync(_vm.SelectedVideo.FilePath, currentSec);
+                    }
+                }
+            }
+        }
+
+        private void UpdateTimeText()
+        {
+            // current
+            var curSec = (int)Math.Floor(Player.Position.TotalSeconds);
+
+            // total: try MediaElement.NaturalDuration first, then metadata
+            long totalSec = 0;
+            if (Player.NaturalDuration.HasTimeSpan)
+            {
+                totalSec = (long)Math.Round(Player.NaturalDuration.TimeSpan.TotalSeconds);
+            }
+            else if (_vm.SelectedVideo?.Duration is long dur && dur > 0)
+            {
+                totalSec = dur;
+            }
+            else
+            {
+                totalSec = 0;
+            }
+
+            timeText.Text = $"{FormatTime(curSec)} / {FormatTime(totalSec)}";
+        }
+
+        private static string FormatTime(long totalSeconds)
+        {
+            if (totalSeconds <= 0) return "0:00";
+            var ts = TimeSpan.FromSeconds(totalSeconds);
+            if (ts.TotalHours >= 1)
+                return ts.ToString(@"h\:mm\:ss");
+            return ts.ToString(@"m\:ss");
+        }
+
+        private async void MainWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            try
+            {
+                // Перед закрытием — сохранить финальную позицию для текущей части (если есть)
+                if (_currentPartId.HasValue && _vm.SelectedVideo != null)
+                {
+                    var sec = (long)Math.Floor(Player.Position.TotalSeconds);
+                    await _playbackService.SavePositionByPartIdAsync(_vm.CourseRootPath, _currentPartId.Value, sec);
+                }
+
+                // и сбросить pending (Flush)
+                await _playbackService.FlushAsync();
+            }
+            catch
+            {
+                // не мешаем закрытию из-за ошибок записи
             }
         }
 

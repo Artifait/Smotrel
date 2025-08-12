@@ -1,8 +1,13 @@
-﻿
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Smotrel.Data.Entities;
 using Smotrel.Helpers;
 using Smotrel.Messages;
 using Smotrel.Models;
@@ -12,15 +17,25 @@ namespace Smotrel.ViewModels
 {
     public class MainViewModel : BaseViewModel
     {
-        private readonly IVideoLibraryService _libraryService;
-        private readonly string[] _videoExtensions = new[] { ".mp4", ".mkv", ".avi", ".mov" };
+        private readonly ICourseScanner _scanner;
+        private readonly ICourseRepository _repository;
+        private readonly ICourseMergeService _mergeService;
+        private readonly IPlaybackService _playbackService;
+
+        private readonly string[] _videoExtensions = new[] { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv" };
+
         private int _currentIndex = -1;
 
         /// <summary>
-        /// Корневая папка — для TreeView
+        /// Путь к корню текущего загруженного курса (null если не загружен)
         /// </summary>
-        private FolderNodeViewModel _root;
-        public FolderNodeViewModel Root
+        public string? CourseRootPath { get; private set; }
+
+        /// <summary>
+        /// Корневая папка — для TreeView (построена из CourseEntity)
+        /// </summary>
+        private FolderNodeViewModel? _root;
+        public FolderNodeViewModel? Root
         {
             get => _root;
             private set
@@ -34,12 +49,12 @@ namespace Smotrel.ViewModels
         }
 
         /// <summary>
-        /// Плоский плейлист текущей главы
+        /// Плоский плейлист текущей главы/курса
         /// </summary>
         public ObservableCollection<VideoItem> Playlist { get; } = new();
 
-        private VideoItem _selectedVideo;
-        public VideoItem SelectedVideo
+        private VideoItem? _selectedVideo;
+        public VideoItem? SelectedVideo
         {
             get => _selectedVideo;
             set
@@ -70,10 +85,11 @@ namespace Smotrel.ViewModels
                 SelectedVideo = Playlist[_currentIndex];
             }
         }
+
         /// <summary>
         /// Путь для MediaElement.Source
         /// </summary>
-        public string CurrentVideoPath => SelectedVideo?.FilePath;
+        public string? CurrentVideoPath => SelectedVideo?.FilePath;
 
         // Команды
         public ICommand BrowseCommand { get; }
@@ -84,13 +100,22 @@ namespace Smotrel.ViewModels
         public ICommand NormalSpeedCommand { get; }
         public ICommand FullscreenCommand { get; }
 
-        public MainViewModel(IVideoLibraryService libraryService)
+        public MainViewModel(
+            ICourseScanner scanner,
+            ICourseRepository repository,
+            ICourseMergeService mergeService,
+            IPlaybackService playbackService,
+            IVideoLibraryService? legacyLibraryService = null) // legacy optional
         {
-            _libraryService = libraryService ?? throw new ArgumentNullException(nameof(libraryService));
+            _scanner = scanner ?? throw new ArgumentNullException(nameof(scanner));
+            _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _mergeService = mergeService ?? throw new ArgumentNullException(nameof(mergeService));
+            _playbackService = playbackService ?? throw new ArgumentNullException(nameof(playbackService));
 
-            // Messenger на открытие главы (папки)
+            // Messenger на открытие главы (папки) — прежнее поведение (если кто-то шлёт OpenFolderMessage)
             WeakReferenceMessenger.Default.Register<OpenFolderMessage>(this, (_, msg) =>
             {
+                // Prefer to open folder inside loaded course: try to find chapter with that path
                 LoadPlaylistFromFolder(msg.FolderPath);
             });
 
@@ -123,7 +148,7 @@ namespace Smotrel.ViewModels
         }
 
         /// <summary>
-        /// Загрузка всей структуры и автозапуск первого видео
+        /// Загрузка всей структуры: сканируем папку, загружаем/сливаем с БД и строим UI-дерево/плейлист
         /// </summary>
         private async Task LoadLibraryAsync()
         {
@@ -131,17 +156,68 @@ namespace Smotrel.ViewModels
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
 
-            // 1) Строим дерево для TreeView
-            var rootVm = await _libraryService.LoadLibraryAsync(dlg.SelectedPath);
-            Root = rootVm;
+            var rootPath = dlg.SelectedPath;
+            // 1) Сканируем (получим свежую структуру и fsHash)
+            CourseEntity scanned = null!;
+            try
+            {
+                scanned = await _scanner.ScanAsync(rootPath, tryGetDurations: true);
+            }
+            catch (Exception ex)
+            {
+                // TODO: логирование / показать пользователю
+                // fallback: пока используем legacy library service? но лучше уведомить
+                throw new InvalidOperationException("Scan failed: " + ex.Message, ex);
+            }
 
-            // 2) Параллельно заполняем плейлист всем видео из всех папок
-            var allVideos = Flatten(rootVm).ToList();
-            Playlist.Clear();
-            foreach (var vid in allVideos)
-                Playlist.Add(vid);
+            // 2) Загружаем существующую запись из репозитория (если есть)
+            CourseEntity? existing = null;
+            try
+            {
+                existing = await _repository.LoadAsync(rootPath);
+            }
+            catch
+            {
+                // ignore, treat as no existing
+                existing = null;
+            }
 
-            // 3) Сразу запускаем первое
+            CourseEntity toSave;
+            if (existing == null)
+            {
+                toSave = scanned;
+            }
+            else
+            {
+                // если hash совпадает — можем использовать existing (чтобы сохранить user-updated fields)
+                if (!string.IsNullOrWhiteSpace(existing.FsHash) &&
+                    !string.IsNullOrWhiteSpace(scanned.FsHash) &&
+                    string.Equals(existing.FsHash, scanned.FsHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    // обновим lastScanned etc.
+                    existing.LastScannedAt = DateTime.UtcNow;
+                    existing.TotalDurationSeconds = scanned.TotalDurationSeconds ?? existing.TotalDurationSeconds;
+                    toSave = existing;
+                }
+                else
+                {
+                    // merge existing -> scanned
+                    var mergeResult = _mergeService.Merge(existing, scanned);
+                    // backup old DB/json
+                    await _repository.BackupAsync(rootPath, "merge-before-save");
+                    toSave = mergeResult.MergedCourse;
+                }
+            }
+
+            // 3) Сохраняем merged/new into repository
+            await _repository.SaveAsync(toSave);
+
+            // 4) Построим TreeView root и Playlist из toSave
+            CourseRootPath = toSave.RootPath;
+            Root = BuildFolderNodeFromCourse(toSave);
+            PopulatePlaylistFromCourse(toSave);
+
+            // 5) Автозапуск первого видео если есть
             if (Playlist.Any())
             {
                 _currentIndex = 0;
@@ -152,23 +228,120 @@ namespace Smotrel.ViewModels
         }
 
         /// <summary>
-        /// Загрузка плейлиста для конкретной главы (папки)
+        /// Заполнить плейлист всем видео из CourseEntity (в порядке глав -> частей)
+        /// </summary>
+        private void PopulatePlaylistFromCourse(CourseEntity course)
+        {
+            Playlist.Clear();
+            foreach (var ch in course.Chapters.OrderBy(c => c.Order ?? int.MaxValue).ThenBy(c => c.Title))
+            {
+                foreach (var p in ch.Parts.OrderBy(p => p.Index ?? int.MaxValue).ThenBy(p => p.FileName))
+                {
+                    Playlist.Add(new VideoItem
+                    {
+                        Title = string.IsNullOrWhiteSpace(p.Title) ? p.FileName : p.Title,
+                        FilePath = p.Path,
+                        PartId = p.Id.ToString(),
+                        ChapterId = ch.Id.ToString(),
+                        CourseId = course.Id.ToString(),
+                        Duration = p.DurationSeconds ?? 0,
+                        LastPosition = p.LastPositionSeconds,
+                        Watched = p.Watched
+                    });
+                }
+            }
+        }
+
+        /// <summary>
+        /// Строит FolderNodeViewModel из CourseEntity.Chapters
+        /// </summary>
+        private FolderNodeViewModel BuildFolderNodeFromCourse(CourseEntity course)
+        {
+            // Root folder
+            var rootVm = new FolderNodeViewModel(string.IsNullOrWhiteSpace(course.Title) ? Path.GetFileName(course.RootPath) : course.Title, course.RootPath);
+
+            // For each chapter: create a folder node with VideoNode children
+            foreach (var ch in course.Chapters.OrderBy(c => c.Order ?? int.MaxValue).ThenBy(c => c.Title))
+            {
+                // compute absolute path of chapter
+                var absPath = ch.RelPath == "." ? course.RootPath : Path.Combine(course.RootPath, ch.RelPath);
+                var chVm = new FolderNodeViewModel(string.IsNullOrWhiteSpace(ch.Title) ? ch.RelPath : ch.Title, absPath);
+
+                foreach (var p in ch.Parts.OrderBy(p => p.Index ?? int.MaxValue).ThenBy(p => p.FileName))
+                {
+                    var videoItem = new VideoItem
+                    {
+                        Title = string.IsNullOrWhiteSpace(p.Title) ? p.FileName : p.Title,
+                        FilePath = p.Path,
+                        PartId = p.Id.ToString(),
+                        ChapterId = ch.Id.ToString(),
+                        CourseId = course.Id.ToString(),
+                        Duration = p.DurationSeconds ?? 0,
+                        LastPosition = p.LastPositionSeconds,
+                        Watched = p.Watched
+                    };
+                    var videoNode = new VideoNodeViewModel(videoItem);
+                    chVm.Children.Add(videoNode);
+                }
+
+                rootVm.Children.Add(chVm);
+            }
+
+            return rootVm;
+        }
+
+        /// <summary>
+        /// Загрузка плейлиста для конкретной главы (папки) — теперь на базе уже загруженного CourseRootPath/Root
         /// </summary>
         private void LoadPlaylistFromFolder(string folderPath)
         {
-            var videos = Directory.GetFiles(folderPath)
-                                  .Where(f => _videoExtensions.Contains(Path.GetExtension(f).ToLower()))
-                                  .OrderBy(f => f)
-                                  .Select(f => new VideoItem
-                                  {
-                                      Title = Path.GetFileNameWithoutExtension(f),
-                                      FilePath = f
-                                  })
-                                  .ToList();
+            if (string.IsNullOrWhiteSpace(folderPath)) return;
+
+            // Если у нас есть CourseRootPath и Root, то пытаемся найти chapter matching folderPath
+            // сравниваем normalized absolute paths
+            var target = NormalizePath(folderPath);
+
+            // try find chapter node under Root
+            FolderNodeViewModel? found = null;
+            if (Root != null)
+            {
+                // search recursively
+                found = FindFolderNode(Root, target);
+            }
+
+            // build playlist from found chapter or fallback to scanning files in folder
+            List<VideoItem> videos = new();
+
+            if (found != null)
+            {
+                foreach (var child in found.Children)
+                {
+                    if (child is VideoNodeViewModel v)
+                        videos.Add(v.Video);
+                }
+            }
+            else
+            {
+                // fallback: simple dir scan (legacy)
+                if (Directory.Exists(folderPath))
+                {
+                    var files = Directory.GetFiles(folderPath)
+                                         .Where(f => _videoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                                         .OrderBy(f => f)
+                                         .ToList();
+                    foreach (var f in files)
+                    {
+                        videos.Add(new VideoItem
+                        {
+                            Title = Path.GetFileNameWithoutExtension(f),
+                            FilePath = f
+                        });
+                    }
+                }
+            }
 
             Playlist.Clear();
-            foreach (var vid in videos)
-                Playlist.Add(vid);
+            foreach (var v in videos) Playlist.Add(v);
 
             if (Playlist.Any())
             {
@@ -177,6 +350,20 @@ namespace Smotrel.ViewModels
             }
 
             RaiseNavCommandsCanExecuteChanged();
+        }
+
+        private FolderNodeViewModel? FindFolderNode(FolderNodeViewModel root, string normalizedAbsPath)
+        {
+            if (NormalizePath(root.FolderPath) == normalizedAbsPath)
+                return root;
+
+            foreach (var child in root.Children.OfType<FolderNodeViewModel>())
+            {
+                var found = FindFolderNode(child, normalizedAbsPath);
+                if (found != null) return found;
+            }
+
+            return null;
         }
 
         public void MoveNext()
@@ -207,6 +394,7 @@ namespace Smotrel.ViewModels
             SelectedVideo = Playlist[_currentIndex];
             RaiseNavCommandsCanExecuteChanged();
         }
+
         private bool CanMoveNext() => _currentIndex < Playlist.Count - 1;
         private bool CanMovePrevious() => _currentIndex > 0;
 
@@ -217,7 +405,7 @@ namespace Smotrel.ViewModels
         }
 
         /// <summary>
-        /// Рекурсивно собирает все видео из дерева папок
+        /// Рекурсивно собирает все видео из дерева папок (оставил для совместимости)
         /// </summary>
         private IEnumerable<VideoItem> Flatten(FolderNodeViewModel folder)
         {
@@ -228,6 +416,21 @@ namespace Smotrel.ViewModels
                 else if (child is FolderNodeViewModel f)
                     foreach (var sub in Flatten(f))
                         yield return sub;
+            }
+        }
+
+        // утилиты
+        private static string NormalizePath(string? p)
+        {
+            if (string.IsNullOrWhiteSpace(p)) return string.Empty;
+            try
+            {
+                return Path.GetFullPath(p).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    .ToLowerInvariant();
+            }
+            catch
+            {
+                return p.Trim().ToLowerInvariant();
             }
         }
     }
