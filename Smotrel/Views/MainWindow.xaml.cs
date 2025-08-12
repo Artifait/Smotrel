@@ -1,5 +1,4 @@
-﻿using System;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -9,7 +8,6 @@ using Smotrel.Messages;
 using Smotrel.Services;
 using Smotrel.ViewModels;
 using System.Windows.Media.Animation;
-using System.Windows.Controls;
 
 using Point = System.Windows.Point;
 
