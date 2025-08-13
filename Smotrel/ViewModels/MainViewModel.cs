@@ -78,6 +78,23 @@ namespace Smotrel.ViewModels
             }
         }
 
+        private double _selectedPlaybackRate = 1.0;
+        public IReadOnlyList<double> AvailablePlaybackRates { get; } = new List<double> { 0.5, 0.75, 1.0, 1.25, 1.5, 2.0 };
+
+        public double SelectedPlaybackRate
+        {
+            get => _selectedPlaybackRate;
+            set
+            {
+                if (Math.Abs(_selectedPlaybackRate - value) > 0.0001)
+                {
+                    _selectedPlaybackRate = value;
+                    OnPropertyChanged(nameof(SelectedPlaybackRate));
+                    // отправим сообщение, чтобы View (MainWindow) применил скорость к MediaElement
+                    WeakReferenceMessenger.Default.Send(new PlaybackSpeedChangedMessage(_selectedPlaybackRate));
+                }
+            }
+        }
         private async Task CheckAndNotifyResumeForSelectedAsync()
         {
             try

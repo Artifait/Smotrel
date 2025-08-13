@@ -124,7 +124,8 @@
                     <!-- Центр — кликабельная зона -->
                     <Border Grid.Row="1"
                             Background="Transparent"
-                            MouseLeftButtonDown="Player_MouseLeftButtonDown"/>
+                            MouseLeftButtonDown="Player_MouseLeftButtonDown"
+                            />
 
                     <!-- Большой центрированный индикатор (Play / Pause) -->
                     <TextBlock x:Name="centerIcon"
@@ -145,12 +146,13 @@
                     <!-- Resume banner (initially collapsed) -->
                     <StackPanel x:Name="ResumeBanner"
                                 Grid.Row="1"
-                                Orientation="Horizontal"
+                                Orientation="Vertical"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Bottom"
-                                Margin="0,0,10,0"
+                                Margin="0,0,0,0"
                                 Visibility="Collapsed">
-                        <Border Background="#AA111111" Padding="8" CornerRadius="6">
+
+                        <Border Background="#AA111111" Padding="8" CornerRadius="6 0 0 0">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock x:Name="ResumeText"
                                            Text="Продолжить с 0:00?"
@@ -166,8 +168,22 @@
                                         Content="✖ Сбросить"/>
                             </StackPanel>
                         </Border>
+
+                        <!-- Yellow progress bar showing remaining time before auto-hide -->
+                        <Border Height="6" CornerRadius="3" Margin="0,0,0,0" Background="#333" Padding="1">
+                            <ProgressBar x:Name="ResumeProgressBar"
+                                         Height="4"
+                                         Minimum="0"
+                                         Maximum="1000"           
+                                         Value="0"
+                                         IsIndeterminate="False"
+                                         Foreground="#FFDD00"
+                                         Background="#555"
+                                         BorderThickness="0"
+                     />
+                        </Border>
                     </StackPanel>
-                    
+
                     <!-- Низ: панель управления -->
                     <StackPanel Grid.Row="2"
                                 Orientation="Vertical"
@@ -186,7 +202,6 @@
                                     Grid.Column="0"
                                     Minimum="0"
                                     Maximum="100"
-                                    ValueChanged="videoSlider_ValueChanged"
                                     PreviewMouseDown="Slider_PreviewMouseDown"
                                     PreviewMouseUp="Slider_PreviewMouseUp"/>
 
@@ -197,12 +212,13 @@
                                        Margin="10,0,0,0"
                                        FontSize="14"
                                        Text="0:00 / 0:00"/>
+
                         </Grid>
 
                         <!-- Кнопки -->
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
-                                    Margin="0,5,0,0">
+                                    Margin="0,-10,0,0">
                             <Button Command="{Binding PrevCommand}" Content="⏮"/>
                             <!-- Даём имя, чтобы менять Content в code-behind, но сохраняем Command -->
                             <Button x:Name="btnPausePlay" Command="{Binding PausePlayCommand}" Content="⏸"/>
@@ -215,8 +231,21 @@
                                         Minimum="0"
                                         Maximum="1"
                                         Value="0.5"
-                                        Width="100"
-                                        ValueChanged="volumeSlider_ValueChanged"/>
+                                        Width="100"/>
+                            </StackPanel>
+                            <!-- поместить рядом с Volume в нижней панели -->
+                            <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center">
+                                <ComboBox Width="80"
+                                          ItemsSource="{Binding AvailablePlaybackRates}"
+                                          SelectedItem="{Binding SelectedPlaybackRate, Mode=TwoWay}"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat={}{0:0.##}x}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </StackPanel>
 
                             <Button Command="{Binding FullscreenCommand}" Content="⛶"/>
