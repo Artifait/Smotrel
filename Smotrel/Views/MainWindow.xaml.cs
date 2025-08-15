@@ -27,15 +27,24 @@ namespace Smotrel.Views
         private readonly PlaybackPositionManager _positionManager;
         private readonly PlaylistController _playlistController;
         private readonly OverlayController _overlayController;
-        private readonly PipController _pipController; 
+        private readonly PipController _pipController;
 
+        private bool _isPiPActive = false;
         private bool _isPlaying = true;
         private long? _pendingResumePositionSeconds = null;
         private Guid? _pendingResumePartId = null;
         private string? _pendingResumeCourseRoot = null;
 
+        // pending state from PiP (applied when PiP closed / main is ready)
+        private string? _pendingPiPFilePath = null;
+        private long? _pendingPiPPositionSeconds = null;
+        private double? _pendingPiPSpeed = null;
+        private double? _pendingPiPVolume = null;
+        private bool? _pendingPiPIsPlaying = null;
+        private Guid? _pendingPiPPartId = null;
+
         private readonly DispatcherTimer _resumeAutoHideTimer;
-        private readonly TimeSpan _resumeAutoHideInterval = TimeSpan.FromSeconds(8); // тот же интервал что и раньше
+        private readonly TimeSpan _resumeAutoHideInterval = TimeSpan.FromSeconds(8);
         private DateTime _resumeAutoHideEnd = DateTime.MinValue;
 
         public MainWindow(MainViewModel vm, PipController pipController, IPlaybackService playbackService, ICourseRepository repository)
@@ -50,12 +59,13 @@ namespace Smotrel.Views
             DataContext = _vm;
             _vm.PropertyChanged += Vm_PropertyChanged;
 
-            // controllers (создаём и инициализируем)
+            // controllers
             _playerController = new PlayerController();
             _playerController.Initialize(Player);
             _playerController.MediaOpened += Player_MediaOpened;
             _playerController.MediaEnded += Player_MediaEnded;
             _playerController.PositionChanged += Player_PositionChanged;
+            _playerController.PlayingStateChanged += Player_PlayingStateChanged;
 
             _positionManager = new PlaybackPositionManager(_playbackService);
             _playlistController = new PlaylistController(_vm);
@@ -68,16 +78,19 @@ namespace Smotrel.Views
             WeakReferenceMessenger.Default.Register<VideoControlMessage>(this, HandleVideoControl);
             WeakReferenceMessenger.Default.Register<ResumeAvailableMessage>(this, (r, msg) => OnResumeAvailable(msg));
             WeakReferenceMessenger.Default.Register<PlaybackSpeedChangedMessage>(this, (r, msg) => _playerController.Speed = msg.Speed);
+            WeakReferenceMessenger.Default.Register<PiPStateChangedMessage>(this, (r, msg) =>
+            {
+                Dispatcher.Invoke(() => OnPiPStateChanged(msg.IsActive));
+            });
+            WeakReferenceMessenger.Default.Register<PlaybackStateMessage>(this, (r, msg) =>
+            {
+                Dispatcher.Invoke(() => OnPlaybackStateMessage(msg));
+            });
 
-            // Программно устанавливаем начальные значения и подписываемся на обработчики
-            // Устанавливаем начальную громкость (без преждевременного вызова обработчика)
+            // initial UI sync
             volumeSlider.Value = _playerController.Volume;
-
-            // Подписываемся на ValueChanged **после** инициализации контроллеров
             volumeSlider.ValueChanged += volumeSlider_ValueChanged;
             videoSlider.ValueChanged += videoSlider_ValueChanged;
-
-            // синхронизируем контроллер с UI (на случай, если ещё требуется)
             _playerController.Volume = volumeSlider.Value;
 
             UpdatePlayButton();
@@ -85,8 +98,84 @@ namespace Smotrel.Views
             this.Closing += MainWindow_Closing;
         }
 
+        private void OnPlaybackStateMessage(PlaybackStateMessage msg)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(msg.FilePath)) return;
 
-        // VM property changes
+                var currentPath = _vm?.SelectedVideo?.FilePath;
+                // Если PiP активен — не применять напрямую, а сохранить как pending
+                if (_isPiPActive)
+                {
+                    _pendingPiPFilePath = msg.FilePath;
+                    _pendingPiPPositionSeconds = msg.PositionSeconds;
+                    _pendingPiPSpeed = msg.Speed;
+                    _pendingPiPVolume = msg.Volume;
+                    _pendingPiPIsPlaying = msg.IsPlaying;
+                    _pendingPiPPartId = msg.PartId;
+                    return;
+                }
+
+                // Если текущий файл совпадает — применяем сразу
+                if (!string.IsNullOrWhiteSpace(currentPath) &&
+                    string.Equals(currentPath, msg.FilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        _playerController.Seek(TimeSpan.FromSeconds(msg.PositionSeconds));
+                        _playerController.Speed = msg.Speed;
+                        _playerController.Volume = msg.Volume;
+
+                        if (msg.IsPlaying)
+                        {
+                            _playerController.Play();
+                            _isPlaying = true;
+                        }
+                        else
+                        {
+                            _playerController.Pause();
+                            _isPlaying = false;
+                        }
+                        UpdatePlayButton();
+                    }
+                    catch { /* ignore */ }
+
+                    ClearPendingPiPState();
+                }
+                else
+                {
+                    // не совпадает — сохраняем pending
+                    _pendingPiPFilePath = msg.FilePath;
+                    _pendingPiPPositionSeconds = msg.PositionSeconds;
+                    _pendingPiPSpeed = msg.Speed;
+                    _pendingPiPVolume = msg.Volume;
+                    _pendingPiPIsPlaying = msg.IsPlaying;
+                    _pendingPiPPartId = msg.PartId;
+                }
+            }
+            catch { /* swallow */ }
+        }
+
+        private void ClearPendingPiPState()
+        {
+            _pendingPiPFilePath = null;
+            _pendingPiPPositionSeconds = null;
+            _pendingPiPSpeed = null;
+            _pendingPiPVolume = null;
+            _pendingPiPIsPlaying = null;
+            _pendingPiPPartId = null;
+        }
+
+        private void Player_PlayingStateChanged(object? sender, bool isPlaying)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _isPlaying = isPlaying;
+                UpdatePlayButton();
+            });
+        }
+
         private void Vm_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(_vm.CurrentVideoPath) && !string.IsNullOrEmpty(_vm.CurrentVideoPath))
@@ -95,14 +184,28 @@ namespace Smotrel.Views
                 {
                     Player.Source = new Uri(_vm.CurrentVideoPath);
                     _playerController.Speed = 1.0;
-                    _playerController.Play();
-                    _isPlaying = true;
+
+                    // Если PiP активен — не стартуем воспроизведение в main
+                    if (!_isPiPActive)
+                    {
+                        _playerController.Play();
+                        _isPlaying = true;
+                    }
+                    else
+                    {
+                        _playerController.Pause();
+                        _isPlaying = false;
+                    }
+
                     UpdatePlayButton();
                     _overlayController.ShowCenterFeedback(_isPlaying);
                 }
                 catch { }
 
                 UpdateCurrentPartContext();
+
+                // попытка применить pending, если есть (при условии, что PiP не активен)
+                TryApplyPendingPiPStateForCurrent();
             }
 
             if (e.PropertyName == nameof(_vm.SelectedVideo))
@@ -110,6 +213,8 @@ namespace Smotrel.Views
                 UpdateCurrentPartContext();
                 _overlayController.ShowOverlay(isPlaying: _isPlaying);
                 UpdateTimeText();
+
+                TryApplyPendingPiPStateForCurrent();
             }
         }
 
@@ -120,7 +225,6 @@ namespace Smotrel.Views
                 _vm.SelectedVideo?.FilePath);
         }
 
-        // Player controller handlers
         private void Player_MediaOpened(object? sender, EventArgs e)
         {
             try
@@ -140,23 +244,57 @@ namespace Smotrel.Views
                 UpdateTimeText();
             }
             catch { }
+
+            // media opened — безопасно применять pending
+            TryApplyPendingPiPStateForCurrent();
         }
 
-        private void Player_MediaEnded(object? sender, EventArgs e)
+        private async void Player_MediaEnded(object? sender, EventArgs e)
         {
-            // mark watched
-            if (!string.IsNullOrWhiteSpace(_vm.CourseRootPath) && _vm.SelectedVideo != null && Guid.TryParse(_vm.SelectedVideo.PartId, out var pid))
+            try
             {
-                _ = _playbackService.MarkWatchedByPartIdAsync(_vm.CourseRootPath, pid);
-            }
+                // 1) Пометка в UI — делаем это сразу, чтобы пользователь видел обновление
+                try
+                {
+                    if (_vm.SelectedVideo != null)
+                    {
+                        // Предположим, SelectedVideo имеет свойство Watched (bool) и оповещает UI
+                        _vm.SelectedVideo.Watched = true;
 
-            // delegate auto-advance to playlist controller
-            _playlistController.OnMediaEnded();
+                        // Если у вас есть связанная модель (VideoItem) — обновим и её (опционально)
+                        // if (_vm.SelectedVideo.Model != null) _vm.SelectedVideo.Model.Watched = true;
+                    }
+                }
+                catch { /* не критично: если viewmodel не поддерживает Watched — пропустим */ }
+
+                // 2) Серверное / репозитарное уведомление (fire-and-forget допустимо, но ждём, чтобы иметь шанс логировать ошибки)
+                if (!string.IsNullOrWhiteSpace(_vm.CourseRootPath) && _vm.SelectedVideo != null
+                    && Guid.TryParse(_vm.SelectedVideo.PartId, out var pid))
+                {
+                    try
+                    {
+                        // не ждём результата UI — выполняем асинхронно, но ждём ошибки внутри
+                        await _playbackService.MarkWatchedByPartIdAsync(_vm.CourseRootPath, pid);
+                    }
+                    catch
+                    {
+                        // можно логировать, но всё равно UI уже обновлён
+                    }
+                }
+
+                // 3) Делегируем авто-переход плейлист-контроллеру (он изменит SelectedVideo на следующий)
+                _playlistController.OnMediaEnded();
+            }
+            catch
+            {
+                // в крайнем случае — просто вызываем OnMediaEnded для корректного поведения
+                try { _playlistController.OnMediaEnded(); } catch { }
+            }
         }
+
 
         private void Player_PositionChanged(object? sender, TimeSpan pos)
         {
-            // update slider & time (on UI thread)
             Dispatcher.Invoke(() =>
             {
                 if (!videoSlider.IsMouseCaptureWithin)
@@ -166,7 +304,6 @@ namespace Smotrel.Views
                 UpdateTimeText();
             });
 
-            // inform position manager (debounced write)
             _positionManager.OnPositionChanged(pos);
         }
 
@@ -177,33 +314,48 @@ namespace Smotrel.Views
             _playerController.Seek(TimeSpan.FromSeconds(posSec));
             if (_isPlaying) _playerController.Play();
 
-            // immediate save
             await _positionManager.SavePositionImmediateAsync(posSec);
         }
 
-        private void videoSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) { /* optional tooltip */ }
+        private void videoSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) { }
 
-        // Controls
         private void HandleVideoControl(object recipient, VideoControlMessage msg)
         {
             switch (msg.Action)
             {
                 case VideoControlAction.Next:
-                    _playerController.Stop();
+                    // Если PiP активен — не управляем main player напрямую (чтобы не запустить воспроизведение)
+                    if (!_isPiPActive)
+                    {
+                        _playerController.Stop();
+                    }
                     _vm.MoveNext();
                     break;
+
                 case VideoControlAction.Previous:
-                    _playerController.Stop();
+                    if (!_isPiPActive)
+                    {
+                        _playerController.Stop();
+                    }
                     _vm.MovePrevious();
                     break;
-                case VideoControlAction.TogglePlayPause:
-                    if (_isPlaying) _playerController.Pause();
-                    else _playerController.Play();
 
-                    _isPlaying = !_isPlaying;
+                case VideoControlAction.TogglePlayPause:
+                    if (_isPlaying)
+                    {
+                        _playerController.Pause();
+                        _isPlaying = false;
+                    }
+                    else
+                    {
+                        _playerController.Play();
+                        _isPlaying = true;
+                    }
+
                     UpdatePlayButton();
                     _overlayController.ShowCenterFeedback(_isPlaying);
                     break;
+
                 case VideoControlAction.SpeedUp:
                     _playerController.Speed *= 2;
                     break;
@@ -235,12 +387,10 @@ namespace Smotrel.Views
             WeakReferenceMessenger.Default.Send(new VideoControlMessage(VideoControlAction.TogglePlayPause));
             if (e.ClickCount == 2)
             {
-                WeakReferenceMessenger.Default.Send(
-                                       new VideoControlMessage(VideoControlAction.ToggleFullscreen));
+                WeakReferenceMessenger.Default.Send(new VideoControlMessage(VideoControlAction.ToggleFullscreen));
             }
         }
 
-        // overlay handlers
         private void ShowOverlay() => _overlayController.ShowOverlay(isPlaying: _isPlaying);
         private void HideOverlay() => _overlayController.HideOverlay();
 
@@ -272,7 +422,7 @@ namespace Smotrel.Views
                 horizontalMargin = (containerWidth - actualVideoWidth) / 2;
             }
 
-            ControlOverlay.Margin = new Thickness(horizontalMargin, 0, horizontalMargin, verticalMargin);
+            ControlOverlay.Margin = new Thickness(horizontalMargin, verticalMargin, horizontalMargin, verticalMargin);
         }
 
         private void volumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -280,7 +430,6 @@ namespace Smotrel.Views
             _playerController.Volume = e.NewValue;
         }
 
-        // UI helpers
         private void UpdatePlayButton()
         {
             if (btnPausePlay != null)
@@ -306,23 +455,69 @@ namespace Smotrel.Views
             return ts.TotalHours >= 1 ? ts.ToString(@"h\:mm\:ss") : ts.ToString(@"m\:ss");
         }
 
-        // Resume banner handling (kept in Window for now)
+        /// <summary>
+        /// Попытка применить pending состояния из PiP к текущему открытому видео.
+        /// Применяем только когда PiP **не** активен — иначе main должен оставаться пассивным.
+        /// </summary>
+        private void TryApplyPendingPiPStateForCurrent()
+        {
+            try
+            {
+                if (_isPiPActive) return; // не применяем пока PiP открыт
+
+                if (string.IsNullOrWhiteSpace(_pendingPiPFilePath)) return;
+                var currentPath = _vm?.SelectedVideo?.FilePath ?? _vm?.CurrentVideoPath;
+                if (string.IsNullOrWhiteSpace(currentPath)) return;
+
+                if (!string.Equals(currentPath, _pendingPiPFilePath, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                try
+                {
+                    if (_pendingPiPPositionSeconds.HasValue)
+                    {
+                        _playerController.Seek(TimeSpan.FromSeconds(_pendingPiPPositionSeconds.Value));
+                    }
+
+                    if (_pendingPiPSpeed.HasValue) _playerController.Speed = _pendingPiPSpeed.Value;
+                    if (_pendingPiPVolume.HasValue) _playerController.Volume = _pendingPiPVolume.Value;
+
+                    if (_pendingPiPIsPlaying.HasValue && _pendingPiPIsPlaying.Value)
+                    {
+                        _playerController.Play();
+                        _isPlaying = true;
+                    }
+                    else
+                    {
+                        _playerController.Pause();
+                        _isPlaying = false;
+                    }
+
+                    UpdatePlayButton();
+                }
+                catch
+                {
+                    // если seek не сработал (еще не открыт) — MediaOpened вызовет повторную попытку
+                }
+
+                ClearPendingPiPState();
+            }
+            catch { /* swallow */ }
+        }
+
         private void OnResumeAvailable(ResumeAvailableMessage msg)
         {
             Dispatcher.Invoke(() =>
             {
-                // Только если выбран тот же кусок — показываем
                 if (_vm.SelectedVideo != null && Guid.TryParse(_vm.SelectedVideo.PartId, out var sid) && sid == msg.PartId)
                 {
-                    // кешируем данные (используем данные из message — они актуальны на момент скана/проверки)
                     _pendingResumePartId = msg.PartId;
                     _pendingResumePositionSeconds = msg.PositionSeconds;
-                    _pendingResumeCourseRoot = msg.CourseRootPath; // если в message есть
+                    _pendingResumeCourseRoot = msg.CourseRootPath;
 
                     ResumeText.Text = $"Продолжить с {FormatTime(msg.PositionSeconds)}?";
                     ResumeBanner.Visibility = Visibility.Visible;
 
-                    // Настройка прогресс-бара (если он есть)
                     var totalMs = _resumeAutoHideInterval.TotalMilliseconds;
                     ResumeProgressBar.Maximum = totalMs;
                     ResumeProgressBar.Value = totalMs;
@@ -330,14 +525,8 @@ namespace Smotrel.Views
                     _resumeAutoHideTimer.Stop();
                     _resumeAutoHideTimer.Start();
                 }
-                else
-                {
-                    // не для текущего селекта — игнорируем
-                }
             });
         }
-
-
 
         private async void BtnResume_Click(object sender, RoutedEventArgs e)
         {
@@ -350,56 +539,40 @@ namespace Smotrel.Views
 
         private async void BtnClearResume_Click(object sender, RoutedEventArgs e)
         {
-            // Остановим таймер и скроем UI
             _resumeAutoHideTimer.Stop();
             ResumeProgressBar.Value = 0;
             ResumeBanner.Visibility = Visibility.Collapsed;
 
-            // Очистим локальный кэш
             _pendingResumePartId = null;
             _pendingResumePositionSeconds = null;
             _pendingResumeCourseRoot = null;
 
-            // И попытаемся очистить в репозитории
             try
             {
                 if (!string.IsNullOrWhiteSpace(_vm.CourseRootPath))
                     await _playbackService.ClearResumeAsync(_vm.CourseRootPath);
             }
-            catch
-            {
-                // ignore errors
-            }
+            catch { }
         }
-
 
         private async Task ContinueFromResumeAsync()
         {
             try
             {
-                // prefer cached resume values (they were set in OnResumeAvailable)
                 if (_pendingResumePartId.HasValue && _pendingResumePositionSeconds.HasValue)
                 {
-                    // validate selected video matches cached part
                     if (_vm.SelectedVideo != null && Guid.TryParse(_vm.SelectedVideo.PartId, out var selId) && selId == _pendingResumePartId.Value)
                     {
                         var pos = _pendingResumePositionSeconds.Value;
                         if (pos > 0)
                         {
-                            // seek and notify
                             _playerController.Seek(TimeSpan.FromSeconds(pos));
-                            try
-                            {
-                                await _playbackService.NotifyPositionAsync(_vm.SelectedVideo.FilePath, pos);
-                            }
-                            catch { }
-                            // optionally clear cached resume? keep it if you want
+                            try { await _playbackService.NotifyPositionAsync(_vm.SelectedVideo.FilePath, pos); } catch { }
                             return;
                         }
                     }
                 }
 
-                // Fallback: try to load from repository (older behavior)
                 if (string.IsNullOrWhiteSpace(_vm.CourseRootPath) || _vm.SelectedVideo == null) return;
                 var course = await _repository.LoadAsync(_vm.CourseRootPath);
                 if (course == null || !course.LastPlayedPartId.HasValue) return;
@@ -410,38 +583,26 @@ namespace Smotrel.Views
                 if (fallbackPos > 0)
                 {
                     _playerController.Seek(TimeSpan.FromSeconds(fallbackPos));
-                    try
-                    {
-                        await _playbackService.NotifyPositionAsync(_vm.SelectedVideo.FilePath, fallbackPos);
-                    }
-                    catch { }
+                    try { await _playbackService.NotifyPositionAsync(_vm.SelectedVideo.FilePath, fallbackPos); } catch { }
                 }
             }
-            catch
-            {
-                // ignore
-            }
+            catch { }
             finally
             {
-                // cleanup cached info after trying to resume to avoid reusing stale values
                 _pendingResumePartId = null;
                 _pendingResumePositionSeconds = null;
                 _pendingResumeCourseRoot = null;
 
-                // stop timer and hide banner just in case
                 _resumeAutoHideTimer.Stop();
                 ResumeProgressBar.Value = 0;
                 ResumeBanner.Visibility = Visibility.Collapsed;
             }
         }
 
-
-        // Closing / flush
         private async void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
             try
             {
-                // final save
                 if (_vm.SelectedVideo != null && !string.IsNullOrWhiteSpace(_vm.CourseRootPath) && Guid.TryParse(_vm.SelectedVideo.PartId, out var pid))
                 {
                     var sec = (long)Math.Floor(_playerController.Position.TotalSeconds);
@@ -453,15 +614,9 @@ namespace Smotrel.Views
             catch { }
             finally
             {
-                // Отписываемся от программных событий
-                try
-                {
-                    volumeSlider.ValueChanged -= volumeSlider_ValueChanged;
-                    videoSlider.ValueChanged -= videoSlider_ValueChanged;
-                }
-                catch { }
+                try { volumeSlider.ValueChanged -= volumeSlider_ValueChanged; } catch { }
+                try { videoSlider.ValueChanged -= videoSlider_ValueChanged; } catch { }
 
-                // Dispose controllers
                 try { _playerController.Dispose(); } catch { }
                 try { _positionManager.Dispose(); } catch { }
 
@@ -476,7 +631,6 @@ namespace Smotrel.Views
                 var now = DateTime.UtcNow;
                 if (_resumeAutoHideEnd <= now)
                 {
-                    // время вышло — скрываем баннер и останавливаем таймер
                     ResumeBanner.Visibility = Visibility.Collapsed;
                     ResumeProgressBar.Value = 0;
                     _resumeAutoHideTimer.Stop();
@@ -487,13 +641,9 @@ namespace Smotrel.Views
                 var remainingMs = remaining.TotalMilliseconds;
                 var totalMs = _resumeAutoHideInterval.TotalMilliseconds;
 
-                // progress = remainingMs (we set Maximum = totalMs when starting)
                 ResumeProgressBar.Value = Math.Max(0, Math.Min(totalMs, remainingMs));
             }
-            catch
-            {
-                // игнорируем ошибки UI-таймера
-            }
+            catch { }
         }
 
         private async void BtnPiP_Click(object sender, RoutedEventArgs e)
@@ -502,7 +652,24 @@ namespace Smotrel.Views
             if (file == null) return;
             var partId = Guid.TryParse(_vm.SelectedVideo!.PartId, out var pid) ? pid : (Guid?)null;
             var wasPlaying = _isPlaying;
+
             await _pipController.OpenPiPAsync(_playerController, file, _playerController.Position, _playerController.Speed, _playerController.Volume, wasPlaying, _vm.CourseRootPath, partId);
+        }
+
+        private void OnPiPStateChanged(bool isActive)
+        {
+            _isPiPActive = isActive;
+            if (_isPiPActive)
+            {
+                try { _playerController?.Pause(); } catch { }
+                PiPModeOverlay.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                PiPModeOverlay.Visibility = Visibility.Collapsed;
+                // PiP закрыт — применим pending состояние (если есть)
+                TryApplyPendingPiPStateForCurrent();
+            }
         }
     }
 }

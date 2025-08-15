@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Windows.Controls;
 using System.Windows.Threading;
 
@@ -9,10 +8,12 @@ namespace Smotrel.Controllers
     {
         private MediaElement? _player;
         private readonly DispatcherTimer _positionTimer;
+        private bool _isPlaying;
 
         public event EventHandler? MediaOpened;
         public event EventHandler? MediaEnded;
         public event EventHandler<TimeSpan>? PositionChanged;
+        public event EventHandler<bool>? PlayingStateChanged;
 
         public PlayerController()
         {
@@ -24,7 +25,7 @@ namespace Smotrel.Controllers
                 {
                     PositionChanged?.Invoke(this, _player.Position);
                 }
-                catch { }
+                catch { /* swallow */ }
             };
         }
 
@@ -34,14 +35,55 @@ namespace Smotrel.Controllers
             _player.MediaOpened += Player_MediaOpened;
             _player.MediaEnded += Player_MediaEnded;
             _positionTimer.Start();
+            // initialize playing state as false
+            _isPlaying = false;
         }
 
         private void Player_MediaOpened(object? sender, System.Windows.RoutedEventArgs e) => MediaOpened?.Invoke(this, EventArgs.Empty);
-        private void Player_MediaEnded(object? sender, System.Windows.RoutedEventArgs e) => MediaEnded?.Invoke(this, EventArgs.Empty);
+        private void Player_MediaEnded(object? sender, System.Windows.RoutedEventArgs e)
+        {
+            // set playing state false and notify
+            _isPlaying = false;
+            TryRaisePlayingStateChanged();
+            MediaEnded?.Invoke(this, EventArgs.Empty);
+        }
 
-        public void Play() { try { _player?.Play(); } catch { } }
-        public void Pause() { try { _player?.Pause(); } catch { } }
-        public void Stop() { try { _player?.Stop(); } catch { } }
+        public void Play()
+        {
+            try
+            {
+                if (_player == null) return;
+                _player.Play();
+                _isPlaying = true;
+                TryRaisePlayingStateChanged();
+            }
+            catch { /* swallow */ }
+        }
+
+        public void Pause()
+        {
+            try
+            {
+                if (_player == null) return;
+                _player.Pause();
+                _isPlaying = false;
+                TryRaisePlayingStateChanged();
+            }
+            catch { /* swallow */ }
+        }
+
+        public void Stop()
+        {
+            try
+            {
+                if (_player == null) return;
+                _player.Stop();
+                _isPlaying = false;
+                TryRaisePlayingStateChanged();
+            }
+            catch { /* swallow */ }
+        }
+
         public void Seek(TimeSpan pos) { if (_player != null) _player.Position = pos; }
 
         public double Speed
@@ -62,6 +104,13 @@ namespace Smotrel.Controllers
             set { if (_player != null) _player.Position = value; }
         }
 
+        public bool IsPlaying => _isPlaying;
+
+        private void TryRaisePlayingStateChanged()
+        {
+            try { PlayingStateChanged?.Invoke(this, _isPlaying); } catch { }
+        }
+
         public bool HasNaturalVideoSize => (_player?.NaturalVideoWidth ?? 0) > 0 && (_player?.NaturalVideoHeight ?? 0) > 0;
         public int NaturalVideoWidth => _player?.NaturalVideoWidth ?? 0;
         public int NaturalVideoHeight => _player?.NaturalVideoHeight ?? 0;
@@ -70,11 +119,15 @@ namespace Smotrel.Controllers
         {
             if (_player != null)
             {
-                _player.MediaOpened -= Player_MediaOpened;
-                _player.MediaEnded -= Player_MediaEnded;
+                try { _player.MediaOpened -= Player_MediaOpened; } catch { }
+                try { _player.MediaEnded -= Player_MediaEnded; } catch { }
             }
-            _positionTimer.Stop();
-            _positionTimer.Tick -= (s, e) => { };
+            try
+            {
+                _positionTimer.Stop();
+                _positionTimer.Tick -= (s, e) => { };
+            }
+            catch { }
         }
     }
 }

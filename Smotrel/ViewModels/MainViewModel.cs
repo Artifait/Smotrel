@@ -51,10 +51,10 @@ namespace Smotrel.ViewModels
         /// <summary>
         /// Плоский плейлист текущей главы/курса
         /// </summary>
-        public ObservableCollection<VideoItem> Playlist { get; } = new();
+        public ObservableCollection<PlaylistItemViewModel> Playlist { get; } = new();
 
-        private VideoItem? _selectedVideo;
-        public VideoItem? SelectedVideo
+        private PlaylistItemViewModel? _selectedVideo;
+        public PlaylistItemViewModel? SelectedVideo
         {
             get => _selectedVideo;
             set
@@ -68,12 +68,28 @@ namespace Smotrel.ViewModels
 
                     if (_selectedVideo != null)
                     {
-                        // При изменении выбранного — отправляем сообщение о воспроизведении
+                        // отправляем сообщение с реальным FilePath
                         WeakReferenceMessenger.Default.Send(new PlayVideoMessage(_selectedVideo.FilePath));
-
-                        // Асинхронно проверяем, есть ли resume-маркер курса для этой части
                         _ = CheckAndNotifyResumeForSelectedAsync();
                     }
+                }
+            }
+        }
+
+        private PlaylistItemViewModel? _selected;
+        public PlaylistItemViewModel? SelectedItem
+        {
+            get => _selected;
+            set
+            {
+                if (_selected != value)
+                {
+                    _selected = value;
+                    OnPropertyChanged(nameof(SelectedItem));
+                    OnPropertyChanged(nameof(CurrentVideoPath));
+                    // отправляем PlayVideoMessage
+                    if (_selected != null)
+                        WeakReferenceMessenger.Default.Send(new PlayVideoMessage(_selected.FilePath));
                 }
             }
         }
@@ -132,12 +148,13 @@ namespace Smotrel.ViewModels
             }
         }
 
+
         /// <summary>
         /// Путь для MediaElement.Source
         /// </summary>
         public string? CurrentVideoPath => SelectedVideo?.FilePath;
 
-        public string? CurrentVideoTitle => SelectedVideo?.Title;
+        public string? CurrentVideoTitle => SelectedVideo?.ShortTitle;
 
         // Команды
         public ICommand BrowseCommand { get; }
@@ -310,20 +327,23 @@ namespace Smotrel.ViewModels
             {
                 foreach (var p in ch.Parts.OrderBy(p => p.Index ?? int.MaxValue).ThenBy(p => p.FileName))
                 {
-                    Playlist.Add(new VideoItem
-                    {
-                        Title = string.IsNullOrWhiteSpace(p.Title) ? p.FileName : p.Title,
-                        FilePath = p.Path,
-                        PartId = p.Id.ToString(),
-                        ChapterId = ch.Id.ToString(),
-                        CourseId = course.Id.ToString(),
-                        Duration = p.DurationSeconds ?? 0,
-                        LastPosition = p.LastPositionSeconds,
-                        Watched = p.Watched
-                    });
+                    var title = string.IsNullOrWhiteSpace(p.Title) ? p.FileName : p.Title;
+                    var item = new PlaylistItemViewModel(
+                        rawTitle: title,
+                        filePath: p.Path,
+                        partId: p.Id.ToString(),
+                        chapterId: ch.Id.ToString(),
+                        courseId: course.Id.ToString(),
+                        duration: p.DurationSeconds,
+                        lastPosition: p.LastPositionSeconds,
+                        watched: p.Watched
+                    );
+                    Playlist.Add(item);
                 }
             }
         }
+
+
 
         /// <summary>
         /// Строит FolderNodeViewModel из CourseEntity.Chapters
@@ -408,14 +428,40 @@ namespace Smotrel.ViewModels
                         {
                             Title = Path.GetFileNameWithoutExtension(f),
                             FilePath = f
+                            // остальные поля остаются пустыми/по умолчанию
                         });
                     }
                 }
             }
 
+            // Очистим UI-плейлист и наполним PlaylistItemViewModel (для рендера)
             Playlist.Clear();
-            foreach (var v in videos) Playlist.Add(v);
 
+            foreach (var f in videos)
+            {
+                // используем поля VideoItem, если они заполнены; иначе fallback к имени файла
+                var rawTitle = !string.IsNullOrWhiteSpace(f.Title) ? f.Title : Path.GetFileNameWithoutExtension(f.FilePath);
+                var partId = f.PartId ?? string.Empty;
+                var chapterId = f.ChapterId ?? string.Empty;
+                var courseId = f.CourseId ?? string.Empty;
+                long? duration = null;
+                try { duration = f.Duration; } catch { duration = null; }
+
+                var item = new PlaylistItemViewModel(
+                    rawTitle: rawTitle,
+                    filePath: f.FilePath,
+                    partId: partId,
+                    chapterId: chapterId,
+                    courseId: courseId,
+                    duration: duration,
+                    lastPosition: f.LastPosition,
+                    watched: f.Watched
+                );
+
+                Playlist.Add(item);
+            }
+
+            // Выбор по-умолчанию: первый элемент (если требуется - можно заменить логикой Resume)
             if (Playlist.Any())
             {
                 _currentIndex = 0;
@@ -424,6 +470,7 @@ namespace Smotrel.ViewModels
 
             RaiseNavCommandsCanExecuteChanged();
         }
+
 
         private FolderNodeViewModel? FindFolderNode(FolderNodeViewModel root, string normalizedAbsPath)
         {

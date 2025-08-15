@@ -3,10 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vms="clr-namespace:Smotrel.ViewModels"
         Title="Smotrel Player" Height="600" Width="1000"
-        Background="#1E1E1E" Foreground="White" Icon="/Views/Sprite-0001.ico">
+        Background="#1E1E1E" Foreground="White" Icon="/Views/Sprite-0001.ico"        
+        xmlns:conv="clr-namespace:Smotrel.Converters">
+
 
     <Window.Resources>
-        <!-- Кнопки -->
+        <conv:DurationToStringConverter x:Key="DurationToStringConverter"/>
+        <conv:WatchedToStringConverter x:Key="WatchedToStringConverter"/>
+        <conv:ItemsCountToHeightConverter x:Key="ItemsCountToHeightConverter"/>
+
+        <!-- Общие стили -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="White"/>
@@ -45,25 +51,64 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Стиль карточки плейлиста -->
+        <DataTemplate x:Key="PlaylistItemTemplate" DataType="{x:Type vms:PlaylistItemViewModel}">
+            <Border Padding="8" Margin="1" Background="#222" CornerRadius="6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Vertical">
+                        <!-- ShortTitle показываем, Tooltip содержит полный title без платформы -->
+                        <TextBlock Text="{Binding ShortTitle}"
+                           FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding FullTitle}"
+                           FontSize="14" />
+                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                            <TextBlock Text="{Binding Duration, Converter={StaticResource DurationToStringConverter}}" FontSize="12" Foreground="#CCCCCC"/>
+                            <TextBlock Text=" • " FontSize="12" Foreground="#666" Margin="3,0"/>
+                            <TextBlock Text="{Binding Watched, Converter={StaticResource WatchedToStringConverter}}" FontSize="12" Foreground="#999"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- опционально: правый столбец (иконка/чат) -->
+                    <TextBlock Grid.Column="1" Text="▶" VerticalAlignment="Center" Opacity="0.2" Margin="8,0,0,0"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
     </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="350"/>
+            <ColumnDefinition Width="375"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- Левая панель -->
-        <StackPanel Grid.Column="0" Margin="5">
-            <Button Content="📂 Выбрать папку" Command="{Binding BrowseCommand}"/>
+        <Grid>
+            <Grid.RowDefinitions>
+                <!-- Верхний блок: заголовок + оглавление -->
+                <RowDefinition Height="Auto"/>
 
-            <TreeView Margin="5"
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <!-- Плейлист -->
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Button Content="📂 Выбрать папку" Command="{Binding BrowseCommand}" />
+
+            <TreeView Margin="6" Grid.Row="1"
                       ItemsSource="{Binding Root.SubFolders}"
                       Background="#2A2A2A" Foreground="White">
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate DataType="{x:Type vms:FolderNodeViewModel}"
                                               ItemsSource="{Binding SubFolders}">
-                        <TextBlock Text="{Binding Title}" FontWeight="Bold">
+                        <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White">
                             <TextBlock.InputBindings>
                                 <MouseBinding Gesture="LeftDoubleClick"
                                               Command="{Binding OpenFolderCommand}"/>
@@ -73,15 +118,22 @@
                 </TreeView.ItemTemplate>
             </TreeView>
 
-            <ListBox ItemsSource="{Binding Playlist}"
+            <TextBlock Text="Плейлист" Grid.Row="2" FontWeight="Bold" Margin="4" />
+
+            <ListBox x:Name="PlaylistListBox" Grid.Row="3"
+                     ItemsSource="{Binding Playlist, UpdateSourceTrigger=PropertyChanged}"
                      SelectedIndex="{Binding SelectedIndex}"
-                     DisplayMemberPath="Title"
+                     ItemTemplate="{StaticResource PlaylistItemTemplate}"
                      Background="#2A2A2A" Foreground="White"
-                     Height="400"/>
-        </StackPanel>
+                     Margin="6"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"/>
+
+        </Grid>
 
         <!-- Правая панель: плеер с оверлеем -->
-        <Grid Grid.Column="1" Margin="5">
+        <Grid Grid.Column="1" Margin="8">
             <Grid x:Name="PlayerContainer"
                   MouseEnter="PlayerContainer_MouseEnter"
                   MouseLeave="PlayerContainer_MouseLeave"
@@ -95,9 +147,9 @@
                               UnloadedBehavior="Stop"
                               Stretch="Uniform"
                               MouseLeftButtonDown="Player_MouseLeftButtonDown"
-                              MediaOpened="Player_MediaOpened"/>
+                              MediaOpened="Player_MediaOpened" />
 
-                <!-- Оверлей на весь экран видео -->
+                <!-- Оверлей на весь экран видео (контролы внутри) -->
                 <Grid x:Name="ControlOverlay"
                       Background="#40000000"
                       Opacity="1"
@@ -106,14 +158,11 @@
 
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <!-- Верхняя панель -->
                         <RowDefinition Height="*"/>
-                        <!-- Центр -->
                         <RowDefinition Height="Auto"/>
-                        <!-- Нижняя панель -->
                     </Grid.RowDefinitions>
 
-                    <!-- Верх: название видео -->
+                    <!-- Верх: название -->
                     <Border Background="#80000000" Padding="10">
                         <TextBlock Text="{Binding CurrentVideoTitle}"
                                    FontSize="18"
@@ -121,13 +170,12 @@
                                    VerticalAlignment="Center"/>
                     </Border>
 
-                    <!-- Центр — кликабельная зона -->
+                    <!-- Центр — прозрачная зона для клика -->
                     <Border Grid.Row="1"
                             Background="Transparent"
-                            MouseLeftButtonDown="Player_MouseLeftButtonDown"
-                            />
+                            MouseLeftButtonDown="Player_MouseLeftButtonDown"/>
 
-                    <!-- Большой центрированный индикатор (Play / Pause) -->
+                    <!-- Большой центрированный индикатор -->
                     <TextBlock x:Name="centerIcon"
                                Grid.Row="1"
                                HorizontalAlignment="Center"
@@ -143,15 +191,14 @@
                         </TextBlock.RenderTransform>
                     </TextBlock>
 
-                    <!-- Resume banner (initially collapsed) -->
+                    <!-- Resume banner (right-bottom inside player) -->
                     <StackPanel x:Name="ResumeBanner"
                                 Grid.Row="1"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Bottom"
-                                Margin="0,0,0,0"
+                                Margin="0"
                                 Visibility="Collapsed">
-
                         <Border Background="#AA111111" Padding="8" CornerRadius="6 0 0 0">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock x:Name="ResumeText"
@@ -169,20 +216,36 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Yellow progress bar showing remaining time before auto-hide -->
-                        <Border Height="6" CornerRadius="3" Margin="0,0,0,0" Background="#333" Padding="1">
+                        <Border Height="6" CornerRadius="3" Margin="0,6,0,0" Background="#333" Padding="1">
                             <ProgressBar x:Name="ResumeProgressBar"
                                          Height="4"
                                          Minimum="0"
-                                         Maximum="1000"           
+                                         Maximum="1000"
                                          Value="0"
                                          IsIndeterminate="False"
                                          Foreground="#FFDD00"
                                          Background="#555"
-                                         BorderThickness="0"
-                     />
+                                         BorderThickness="0"/>
                         </Border>
                     </StackPanel>
+
+                    <!-- PiP overlay — ПОЛНОЭКРАННОЕ, должен быть последним дочерним элементом внутри ControlOverlay
+                         чтобы покрывать и видео и нижние контролы (order matters) -->
+                    <Border x:Name="PiPModeOverlay"
+                            Grid.RowSpan="3"
+                            Background="#BF000000"
+                            Visibility="Collapsed"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            CornerRadius="0"
+                            Panel.ZIndex="1000"
+                            IsHitTestVisible="True">
+                        <Grid>
+                            <TextBlock Text="Воспроизводится в PiP" Foreground="#FFDD00"
+                                       FontSize="16" FontWeight="Bold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
 
                     <!-- Низ: панель управления -->
                     <StackPanel Grid.Row="2"
@@ -191,7 +254,6 @@
                                 Margin="0"
                                 IsHitTestVisible="True">
 
-                        <!-- Слайдер времени + время текущего / общей длительности -->
                         <Grid Margin="6">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
@@ -205,26 +267,21 @@
                                     PreviewMouseDown="Slider_PreviewMouseDown"
                                     PreviewMouseUp="Slider_PreviewMouseUp"/>
 
-                            <!-- Время: Current / Total -->
                             <TextBlock x:Name="timeText"
                                        Grid.Column="1"
                                        VerticalAlignment="Center"
                                        Margin="10,0,0,0"
                                        FontSize="14"
                                        Text="0:00 / 0:00"/>
-
                         </Grid>
 
-                        <!-- Кнопки -->
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
-                                    Margin="0,-10,0,0">
+                                    Margin="0,0,0,4">
                             <Button Command="{Binding PrevCommand}" Content="⏮"/>
-                            <!-- Даём имя, чтобы менять Content в code-behind, но сохраняем Command -->
                             <Button x:Name="btnPausePlay" Command="{Binding PausePlayCommand}" Content="⏸"/>
                             <Button Command="{Binding NextCommand}" Content="⏭"/>
 
-                            <!-- Volume -->
                             <StackPanel Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center">
                                 <TextBlock Text="🔊" FontSize="18" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                 <Slider x:Name="volumeSlider"
@@ -233,7 +290,7 @@
                                         Value="0.5"
                                         Width="100"/>
                             </StackPanel>
-                            <!-- поместить рядом с Volume в нижней панели -->
+
                             <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center">
                                 <ComboBox Width="80"
                                           ItemsSource="{Binding AvailablePlaybackRates}"
