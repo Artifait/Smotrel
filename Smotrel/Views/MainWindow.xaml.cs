@@ -27,6 +27,7 @@ namespace Smotrel.Views
         private readonly PlaybackPositionManager _positionManager;
         private readonly PlaylistController _playlistController;
         private readonly OverlayController _overlayController;
+        private readonly PipController _pipController; 
 
         private bool _isPlaying = true;
         private long? _pendingResumePositionSeconds = null;
@@ -37,13 +38,14 @@ namespace Smotrel.Views
         private readonly TimeSpan _resumeAutoHideInterval = TimeSpan.FromSeconds(8); // тот же интервал что и раньше
         private DateTime _resumeAutoHideEnd = DateTime.MinValue;
 
-        public MainWindow(MainViewModel vm, IPlaybackService playbackService, ICourseRepository repository)
+        public MainWindow(MainViewModel vm, PipController pipController, IPlaybackService playbackService, ICourseRepository repository)
         {
             InitializeComponent();
 
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             _playbackService = playbackService ?? throw new ArgumentNullException(nameof(playbackService));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _pipController = pipController ?? throw new ArgumentNullException(nameof(pipController));
 
             DataContext = _vm;
             _vm.PropertyChanged += Vm_PropertyChanged;
@@ -492,6 +494,15 @@ namespace Smotrel.Views
             {
                 // игнорируем ошибки UI-таймера
             }
+        }
+
+        private async void BtnPiP_Click(object sender, RoutedEventArgs e)
+        {
+            var file = _vm.SelectedVideo?.FilePath;
+            if (file == null) return;
+            var partId = Guid.TryParse(_vm.SelectedVideo!.PartId, out var pid) ? pid : (Guid?)null;
+            var wasPlaying = _isPlaying;
+            await _pipController.OpenPiPAsync(_playerController, file, _playerController.Position, _playerController.Speed, _playerController.Volume, wasPlaying, _vm.CourseRootPath, partId);
         }
     }
 }

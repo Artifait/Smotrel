@@ -248,6 +248,8 @@
                                 </ComboBox>
                             </StackPanel>
 
+                            <Button x:Name="btnPiP" Content="◧ PiP" Click="BtnPiP_Click"/>
+
                             <Button Command="{Binding FullscreenCommand}" Content="⛶"/>
                         </StackPanel>
                     </StackPanel>

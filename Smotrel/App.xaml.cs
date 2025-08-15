@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.Extensions.DependencyInjection;
+using Smotrel.Controllers;
 using Smotrel.Services.Implementations;
 using Smotrel.Services.Interfaces;
 using Smotrel.ViewModels;
@@ -33,6 +34,7 @@ namespace Smotrel
             services.AddSingleton<ICourseRepository, CourseJsonRepository>();
             services.AddSingleton<IPlaybackService, PlaybackService>();
 
+            services.AddSingleton<PipController>();
             services.AddSingleton<MainViewModel>(); // <- важно
             services.AddSingleton<MainWindow>();
             services.AddLogging();
