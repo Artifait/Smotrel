@@ -10,6 +10,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решен
 		Readme.md = Readme.md
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "screenshots", "screenshots", "{821C6ADA-2F8E-452E-83B9-86A37D1DA45D}"
+	ProjectSection(SolutionItems) = preProject
+		screenshots\main-window.png = screenshots\main-window.png
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,5 +28,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{821C6ADA-2F8E-452E-83B9-86A37D1DA45D} = {156363D8-0F0B-439A-981A-17FB26ADDC88}
 	EndGlobalSection
 EndGlobal
