@@ -9,21 +9,82 @@ using CommunityToolkit.Mvvm.Messaging;
 using Smotrel.Messages;
 using Point = System.Windows.Point;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using System.Windows.Interop;
 
 namespace Smotrel.Views
 {
     public partial class PiPWindow : Window
     {
+        #region AddFunctForResizeWindow
+        // TODO: вынести всё в конфиги
+        private const int HTLEFT = 10;
+        private const int HTRIGHT = 11;
+        private const int HTTOP = 12;
+        private const int HTTOPLEFT = 13;
+        private const int HTTOPRIGHT = 14;
+        private const int HTBOTTOM = 15;
+        private const int HTBOTTOMLEFT = 16;
+        private const int HTBOTTOMRIGHT = 17;
+
+        private const int WM_NCHITTEST = 0x0084;
+
+        private const int RESIZE_BORDER = 8; // толщина зоны resize в px
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            IntPtr handle = new WindowInteropHelper(this).Handle;
+            HwndSource.FromHwnd(handle)?.AddHook(WindowProc);
+        }
+
+        private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_NCHITTEST)
+            {
+                Point p = PointFromLParam(lParam);
+
+                double width = ActualWidth;
+                double height = ActualHeight;
+
+                // Левый верхний угол
+                if (p.X <= RESIZE_BORDER && p.Y <= RESIZE_BORDER) { handled = true; return (IntPtr)HTTOPLEFT; }
+                // Правый верхний угол
+                if (p.X >= width - RESIZE_BORDER && p.Y <= RESIZE_BORDER) { handled = true; return (IntPtr)HTTOPRIGHT; }
+                // Левый нижний угол
+                if (p.X <= RESIZE_BORDER && p.Y >= height - RESIZE_BORDER) { handled = true; return (IntPtr)HTBOTTOMLEFT; }
+                // Правый нижний угол
+                if (p.X >= width - RESIZE_BORDER && p.Y >= height - RESIZE_BORDER) { handled = true; return (IntPtr)HTBOTTOMRIGHT; }
+
+                // Верх
+                if (p.Y <= RESIZE_BORDER) { handled = true; return (IntPtr)HTTOP; }
+                // Низ
+                if (p.Y >= height - RESIZE_BORDER) { handled = true; return (IntPtr)HTBOTTOM; }
+                // Лево
+                if (p.X <= RESIZE_BORDER) { handled = true; return (IntPtr)HTLEFT; }
+                // Право
+                if (p.X >= width - RESIZE_BORDER) { handled = true; return (IntPtr)HTRIGHT; }
+            }
+
+            // во всех остальных случаях — НЕ перехватываем, чтобы UI оставался кликабельным
+            return IntPtr.Zero;
+        }
+
+
+        private Point PointFromLParam(IntPtr lParam)
+        {
+            int x = unchecked((short)(long)lParam);
+            int y = unchecked((short)((long)lParam >> 16));
+
+            return this.PointFromScreen(new Point(x, y));
+        }
+        #endregion
+
         // NOTE: Мы делаем PiP гибким: либо AttachController(...) (передаёте существующий PlayerController),
         // либо InitializePlayback(file, position, speed, volume, wasPlaying) — PiP создаст свой PlayerController.
         private PlayerController? _controller;
         private bool _isPlaying = false;
         private bool _wasPlayingBeforeSeek = false;
         private readonly DispatcherTimer _uiTimer;
-
-        private bool _isDragging = false;
-        private Point _dragStart;
-        private const double DragThreshold = 6.0;
 
         private long? _pendingResumePositionSeconds = null;
         private Guid? _pendingResumePartId = null;
