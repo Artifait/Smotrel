@@ -8,9 +8,33 @@ using System.Windows.Controls;
 using System.Windows.Forms; // FolderBrowserDialog
 using System.Windows.Threading;
 using System.Windows.Input;
+using System.Globalization;
+using System.Windows.Data;
+using System;
+using System.Globalization;
+using System.Windows.Data;
+using System.Windows;
 
 namespace Smotrel
 {
+    public class SliderValueConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is double doubleValue && parameter is Slider slider)
+            {
+                double percentage = doubleValue / slider.Maximum;
+                return slider.ActualWidth * percentage;
+            }
+            return 0;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class AppSettings
     {
         public string LastFolder { get; set; }
