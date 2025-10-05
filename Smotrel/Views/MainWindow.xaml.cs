@@ -183,7 +183,6 @@ namespace Smotrel.Views
                 try
                 {
                     Player.Source = new Uri(_vm.CurrentVideoPath);
-                    _playerController.Speed = 1.0;
 
                     // Если PiP активен — не стартуем воспроизведение в main
                     if (!_isPiPActive)
@@ -670,6 +669,45 @@ namespace Smotrel.Views
                 // PiP закрыт — применим pending состояние (если есть)
                 TryApplyPendingPiPStateForCurrent();
             }
+        }
+
+        private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape && WindowStyle == WindowStyle.None)
+            {
+                ToggleFullscreen();
+            }
+            else if (e.Key == Key.Up)
+            {
+                volumeSlider.Value = _playerController.UpdateVolume(0.05);
+            }
+            else if(e.Key == Key.Down)
+            {
+                volumeSlider.Value = _playerController.UpdateVolume(-0.05);
+            }
+            else if (e.Key == Key.Right)
+            {
+                var newPos = _playerController.Position + TimeSpan.FromSeconds(5);
+                if (Player.NaturalDuration.HasTimeSpan && newPos > Player.NaturalDuration.TimeSpan)
+                    newPos = Player.NaturalDuration.TimeSpan;
+                _playerController.Seek(newPos);
+            }
+            else if (e.Key == Key.Left)
+            {
+                var newPos = _playerController.Position - TimeSpan.FromSeconds(5);
+                if (newPos < TimeSpan.Zero) newPos = TimeSpan.Zero;
+                _playerController.Seek(newPos);
+            }
+            else if(e.Key == Key.Space)
+            {
+                WeakReferenceMessenger.Default.Send(new VideoControlMessage(VideoControlAction.TogglePlayPause));
+            }
+            else if(e.Key == Key.F)
+            {
+                WeakReferenceMessenger.Default.Send(new VideoControlMessage(VideoControlAction.ToggleFullscreen));
+            }
+
+            e.Handled = false; // чтобы не блокировать другие обработчики
         }
     }
 }

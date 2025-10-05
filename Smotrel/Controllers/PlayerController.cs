@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows.Controls;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace Smotrel.Controllers
@@ -39,7 +40,10 @@ namespace Smotrel.Controllers
             _isPlaying = false;
         }
 
-        private void Player_MediaOpened(object? sender, System.Windows.RoutedEventArgs e) => MediaOpened?.Invoke(this, EventArgs.Empty);
+        private void Player_MediaOpened(object? sender, System.Windows.RoutedEventArgs e)
+        {
+            MediaOpened?.Invoke(this, EventArgs.Empty);
+        }
         private void Player_MediaEnded(object? sender, System.Windows.RoutedEventArgs e)
         {
             // set playing state false and notify
@@ -102,6 +106,12 @@ namespace Smotrel.Controllers
         {
             get => _player?.Position ?? TimeSpan.Zero;
             set { if (_player != null) _player.Position = value; }
+        }
+
+        public double UpdateVolume(double delta)
+        {
+            Volume += delta;
+            return Volume;
         }
 
         public bool IsPlaying => _isPlaying;

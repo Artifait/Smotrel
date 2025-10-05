@@ -154,7 +154,7 @@ namespace Smotrel.ViewModels
         /// </summary>
         public string? CurrentVideoPath => SelectedVideo?.FilePath;
 
-        public string? CurrentVideoTitle => SelectedVideo?.ShortTitle;
+        public string? CurrentVideoTitle => SelectedVideo?.FullTitle;
 
         // Команды
         public ICommand BrowseCommand { get; }
