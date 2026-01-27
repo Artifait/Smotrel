@@ -3,16 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vms="clr-namespace:Smotrel.ViewModels"
         Title="Smotrel Player" Height="600" Width="1000"
-        Background="#1E1E1E" Foreground="White" Icon="/Views/Sprite-0001.ico"        
+        Background="#1E1E1E" Foreground="White" Icon="/Views/Sprite-0001.ico"
         xmlns:conv="clr-namespace:Smotrel.Converters" KeyDown="Window_KeyDown">
-
 
     <Window.Resources>
         <conv:DurationToStringConverter x:Key="DurationToStringConverter"/>
         <conv:WatchedToStringConverter x:Key="WatchedToStringConverter"/>
         <conv:ItemsCountToHeightConverter x:Key="ItemsCountToHeightConverter"/>
 
-        <!-- Общие стили -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="White"/>
@@ -52,9 +50,53 @@
             </Setter>
         </Style>
 
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.LineUpCommand"
+                                          Height="0" Width="0"
+                                          Focusable="False"/>
+                                </Track.DecreaseRepeatButton>
+
+                                <Track.Thumb>
+                                    <Thumb x:Name="PART_Thumb"
+                                   MinHeight="24"
+                                   VerticalAlignment="Stretch"
+                                   Focusable="False">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border CornerRadius="5"
+                                                Background="#FFDD00"
+                                                BorderBrush="#000000"
+                                                BorderThickness="1"
+                                                VerticalAlignment="Stretch"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.LineDownCommand"
+                                          Height="0" Width="0"
+                                          Focusable="False"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
         <DataTemplate x:Key="PlaylistItemTemplate" DataType="{x:Type vms:PlaylistItemViewModel}">
             <Border Padding="8" Margin="1" Background="#222" CornerRadius="6"
-                HorizontalAlignment="Stretch" Width="Auto">
+                    HorizontalAlignment="Stretch" Width="Auto">
                 <Grid HorizontalAlignment="Stretch">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -63,105 +105,125 @@
 
                     <StackPanel Orientation="Vertical" Grid.Column="0" HorizontalAlignment="Stretch">
                         <TextBlock Text="{Binding ShortTitle}"
-                               FontWeight="SemiBold"
-                               ToolTip="{Binding FullTitle}"
-                               FontSize="14"
-                               TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis"
-                               HorizontalAlignment="Stretch"
-                               VerticalAlignment="Top"
-                               MaxHeight="40"/>
+                                   FontWeight="SemiBold"
+                                   ToolTip="{Binding FullTitle}"
+                                   FontSize="14"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   HorizontalAlignment="Stretch"
+                                   VerticalAlignment="Top"
+                                   MaxHeight="40"/>
                         <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                             <TextBlock Text="{Binding Duration, Converter={StaticResource DurationToStringConverter}}"
-                                   FontSize="12"
-                                   Foreground="#CCCCCC"/>
+                                       FontSize="12"
+                                       Foreground="#CCCCCC"/>
                             <TextBlock Text=" • "
-                                   FontSize="12"
-                                   Foreground="#666"
-                                   Margin="3,0"/>
+                                       FontSize="12"
+                                       Foreground="#666"
+                                       Margin="3,0"/>
                             <TextBlock Text="{Binding Watched, Converter={StaticResource WatchedToStringConverter}}"
-                                   FontSize="12"
-                                   Foreground="#999"/>
+                                       FontSize="12"
+                                       Foreground="#999"/>
                         </StackPanel>
                     </StackPanel>
 
                     <TextBlock Grid.Column="1"
-                           Text="▶"
-                           VerticalAlignment="Center"
-                           Opacity="0.2"
-                           Margin="8,0,0,0"/>
+                               Text="▶"
+                               VerticalAlignment="Center"
+                               Opacity="0.2"
+                               Margin="8,0,0,0"/>
                 </Grid>
             </Border>
         </DataTemplate>
     </Window.Resources>
 
-
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="375"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="4*" MinWidth="220"/>
+            <ColumnDefinition Width="6"/>
+            <ColumnDefinition Width="6*" MinWidth="400"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Левая панель -->
-        <Grid>
-            <Grid.RowDefinitions>
-                <!-- Верхний блок: заголовок + оглавление -->
-                <RowDefinition Height="Auto"/>
+        <ScrollViewer Grid.Column="0"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  CanContentScroll="False"
+                  Background="Transparent"
+                  Padding="6">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <!-- Плейлист -->
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <Button Content="📂 Выбрать папку" Command="{Binding BrowseCommand}" />
+                <Button Content="📂 Выбрать папку" Command="{Binding BrowseCommand}" />
 
-            <TreeView Margin="6" Grid.Row="1"
+                <TreeView Grid.Row="1"
                       ItemsSource="{Binding Root.SubFolders}"
-                      Background="#2A2A2A" Foreground="White">
-                <TreeView.ItemTemplate>
-                    <HierarchicalDataTemplate DataType="{x:Type vms:FolderNodeViewModel}"
+                      Background="#2A2A2A"
+                      Foreground="White"
+                      Margin="0,6,0,0"
+                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate DataType="{x:Type vms:FolderNodeViewModel}"
                                               ItemsSource="{Binding SubFolders}">
-                        <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White">
-                            <TextBlock.InputBindings>
-                                <MouseBinding Gesture="LeftDoubleClick"
+                            <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White">
+                                <TextBlock.InputBindings>
+                                    <MouseBinding Gesture="LeftDoubleClick"
                                               Command="{Binding OpenFolderCommand}"/>
-                            </TextBlock.InputBindings>
-                        </TextBlock>
-                    </HierarchicalDataTemplate>
-                </TreeView.ItemTemplate>
-            </TreeView>
+                                </TextBlock.InputBindings>
+                            </TextBlock>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
 
-            <TextBlock Text="Плейлист" Grid.Row="2" FontWeight="Bold" Margin="4" />
-            <ListBox x:Name="PlaylistListBox" Grid.Row="3"
+                <TextBlock Text="Плейлист" Grid.Row="2" FontWeight="Bold" Margin="0,6,0,0" />
+
+                <ListBox x:Name="PlaylistListBox" Grid.Row="3"
                      ItemsSource="{Binding Playlist, UpdateSourceTrigger=PropertyChanged}"
                      SelectedIndex="{Binding SelectedIndex}"
                      ItemTemplate="{StaticResource PlaylistItemTemplate}"
                      Background="#2A2A2A" Foreground="White"
-                     Margin="6"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     Margin="0,6,0,0"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     HorizontalContentAlignment="Stretch"
                      VirtualizingStackPanel.IsVirtualizing="True"
-                     VirtualizingStackPanel.VirtualizationMode="Recycling"
-                     HorizontalContentAlignment="Stretch">
-                <!-- Этот стиль заставит ListBoxItem растягивать контент по ширине ListBox -->
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="Margin" Value="0 0 8 2"/>
-                    </Style>
-                </ListBox.ItemContainerStyle>
-            </ListBox>
-        </Grid>
+                     VirtualizingStackPanel.VirtualizationMode="Recycling">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0 0 8 2"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Grid>
+        </ScrollViewer>
+        
+        <GridSplitter Grid.Column="1"
+                  Width="6"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch"
+                  ShowsPreview="True"
+                  ResizeBehavior="PreviousAndNext"
+                  ResizeDirection="Columns"
+                  Cursor="SizeWE">
+            <GridSplitter.Background>
+                <SolidColorBrush Color="#2E2E2E"/>
+            </GridSplitter.Background>
+        </GridSplitter>
 
-        <!-- Правая панель: плеер с оверлеем -->
-        <Grid Grid.Column="1" Margin="8">
+        <Grid Grid.Column="2" Margin="8">
             <Grid x:Name="PlayerContainer"
                   MouseEnter="PlayerContainer_MouseEnter"
                   MouseLeave="PlayerContainer_MouseLeave"
                   MouseMove="PlayerContainer_MouseMove"
                   SizeChanged="PlayerContainer_SizeChanged">
 
-                <!-- Видео -->
                 <MediaElement x:Name="Player"
                               Source="{Binding CurrentVideoPath}"
                               LoadedBehavior="Manual"
@@ -170,7 +232,6 @@
                               MouseLeftButtonDown="Player_MouseLeftButtonDown"
                               MediaOpened="Player_MediaOpened" />
 
-                <!-- Оверлей на весь экран видео (контролы внутри) -->
                 <Grid x:Name="ControlOverlay"
                       Background="#40000000"
                       Opacity="1"
@@ -183,7 +244,6 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Верх: название -->
                     <Border Background="#80000000" Padding="10">
                         <TextBlock Text="{Binding CurrentVideoTitle}"
                                    FontSize="18"
@@ -191,12 +251,10 @@
                                    VerticalAlignment="Center"/>
                     </Border>
 
-                    <!-- Центр — прозрачная зона для клика -->
                     <Border Grid.Row="1"
                             Background="Transparent"
                             MouseLeftButtonDown="Player_MouseLeftButtonDown"/>
 
-                    <!-- Большой центрированный индикатор -->
                     <TextBlock x:Name="centerIcon"
                                Grid.Row="1"
                                HorizontalAlignment="Center"
@@ -212,7 +270,6 @@
                         </TextBlock.RenderTransform>
                     </TextBlock>
 
-                    <!-- Resume banner (right-bottom inside player) -->
                     <StackPanel x:Name="ResumeBanner"
                                 Grid.Row="1"
                                 Orientation="Vertical"
@@ -250,8 +307,6 @@
                         </Border>
                     </StackPanel>
 
-                    <!-- PiP overlay — ПОЛНОЭКРАННОЕ, должен быть последним дочерним элементом внутри ControlOverlay
-                         чтобы покрывать и видео и нижние контролы (order matters) -->
                     <Border x:Name="PiPModeOverlay"
                             Grid.RowSpan="3"
                             Background="#BF000000"
@@ -268,7 +323,6 @@
                         </Grid>
                     </Border>
 
-                    <!-- Низ: панель управления -->
                     <StackPanel Grid.Row="2"
                                 Orientation="Vertical"
                                 Background="#80000000"
