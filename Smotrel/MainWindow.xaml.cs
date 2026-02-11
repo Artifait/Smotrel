@@ -28,7 +28,7 @@ namespace Smotrel
             InitializeComponent();
             Materials = new ObservableCollection<VData>();
 
-            for(int i = 1; i <= 1; i++)
+            for(int i = 1; i <= 12; i++)
             {
                 Materials.Add(new("Akura " + i) { FullPath = "Sati " + Math.Pow(i, 2) });
             }

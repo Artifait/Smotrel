@@ -54,7 +54,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" BorderThickness="4 4 0 4" Padding="10"
+                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" BorderThickness="2 2 0 2" Padding="3"
                             BorderBrush="{TemplateBinding BorderBrush}">
                             <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
@@ -72,7 +72,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" BorderThickness="4 4 4 4" Padding="10"
+                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" BorderThickness="2 2 2 2" Padding="3"
                             BorderBrush="{TemplateBinding BorderBrush}">
                             <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
@@ -96,8 +96,8 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#9e9e9e"/>
-                                <Setter TargetName="Txt" Property="TextElement.Foreground" Value="#1e1e1e"/>
+                                <Setter TargetName="RootBorder" Property="Background" Value="#2e2e2e"/>
+                                <Setter TargetName="Txt" Property="TextElement.Foreground" Value="White"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -271,7 +271,7 @@
                     </Grid.RowDefinitions>
 
                     <Button Margin="4 4 4 0" Background="Transparent" BorderBrush="Wheat" BorderThickness="4"
-                        Foreground="White" FontFamily="Tw Cen MT Condensed Extra Bold" FontSize="32"
+                        Foreground="AliceBlue" FontFamily="Tw Cen MT Condensed Extra Bold" FontSize="32"
                         Style="{StaticResource AddBtn}">
                         Добавить Материал
                     </Button>
@@ -281,7 +281,7 @@
                                 <ItemsControl x:Name="Data" AlternationCount="2">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Margin="4 4 1 4" x:Name="Root">
+                                            <Border Margin="4 4 2 4" x:Name="Root" Padding="7">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
@@ -290,30 +290,97 @@
                                                     </Grid.ColumnDefinitions>
 
                                                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Padding="10 0 0 0" Foreground="Wheat" FontSize="24"/>
-                                                    <Button Grid.Column="1" Content="&#xE70F;" FontFamily="Segoe MDL2 Assets" 
-                                                            Background="Transparent" BorderBrush="Wheat" Margin="3 0 0 0"
-                                                            Foreground="White" Click="CloseButton_Click" FontSize="24" Padding="2"
-                                                            Style="{StaticResource EditBtn}"/>
-                                                    <Button Grid.Column="2" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets"
-                                                            Background="Transparent" BorderBrush="Wheat"
-                                                            Foreground="White" Click="CloseButton_Click" FontSize="24" Padding="2"
-                                                            Style="{StaticResource DeleteBtn}"/>
+                                                    <Button x:Name="Edit"
+                                                            Grid.Column="1"
+                                                            Content="&#xE70F;"
+                                                            FontFamily="Segoe MDL2 Assets"
+                                                            Background="Transparent"
+                                                            Foreground="White" BorderBrush="WhiteSmoke"
+                                                            Click="CloseButton_Click"
+                                                            FontSize="36" Style="{StaticResource EditBtn}"
+                                                            Padding="2"
+                                                            Opacity="0">
+                                                        <Button.RenderTransform>
+                                                            <TranslateTransform X="10"/>
+                                                        </Button.RenderTransform>
+                                                    </Button>
+
+                                                    <Button x:Name="Delete"
+                                                            Grid.Column="2"
+                                                            Content="&#xE74D;"
+                                                            FontFamily="Segoe MDL2 Assets"
+                                                            Background="Transparent" BorderBrush="WhiteSmoke"
+                                                            Foreground="White"  Style="{StaticResource DeleteBtn}"
+                                                            Click="CloseButton_Click"
+                                                            FontSize="36"
+                                                            Padding="2"
+                                                            Opacity="0">
+                                                        <Button.RenderTransform>
+                                                            <TranslateTransform X="10"/>
+                                                        </Button.RenderTransform>
+                                                    </Button>
                                                 </Grid>
                                                 <Border.Style>
                                                     <Style TargetType="Border">
                                                         <Setter Property="Background" Value="#1e2e2e"/>
+                                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                                        <Setter Property="BorderThickness" Value="2"/>
+                                                        
                                                         <Style.Triggers>
                                                             <DataTrigger
-                                                                Binding="{Binding
-                                                                    RelativeSource={RelativeSource AncestorType=ContentPresenter},
-                                                                    Path=(ItemsControl.AlternationIndex)}"
-                                                                Value="0">
+                                                                    Binding="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter},
+                                                                    Path=(ItemsControl.AlternationIndex)}" Value="0">
                                                                 <Setter Property="Background" Value="#242424"/>
                                                             </DataTrigger>
+
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="BorderBrush" Value="White"/>
+                                                            </Trigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
                                             </Border>
+                                            <DataTemplate.Triggers>
+                                                <Trigger SourceName="Root" Property="IsMouseOver" Value="True">
+                                                    <Trigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetName="Edit"
+                                                                                 Storyboard.TargetProperty="Opacity"
+                                                                                 To="1" Duration="0:0:0.2"/>
+                                                                <DoubleAnimation Storyboard.TargetName="Delete"
+                                                                                 Storyboard.TargetProperty="Opacity"
+                                                                                 To="1" Duration="0:0:0.2"/>
+                                                                <DoubleAnimation Storyboard.TargetName="Edit"
+                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
+                                                                                 To="0" Duration="0:0:0.2"/>
+                                                                <DoubleAnimation Storyboard.TargetName="Delete"
+                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
+                                                                                 To="0" Duration="0:0:0.2"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </Trigger.EnterActions>
+
+                                                    <Trigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetName="Edit"
+                                                                                 Storyboard.TargetProperty="Opacity"
+                                                                                 To="0" Duration="0:0:0.15"/>
+                                                                <DoubleAnimation Storyboard.TargetName="Delete"
+                                                                                 Storyboard.TargetProperty="Opacity"
+                                                                                 To="0" Duration="0:0:0.15"/>
+                                                                <DoubleAnimation Storyboard.TargetName="Edit"
+                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
+                                                                                 To="10" Duration="0:0:0.15"/>
+                                                                <DoubleAnimation Storyboard.TargetName="Delete"
+                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
+                                                                                 To="10" Duration="0:0:0.15"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </Trigger.ExitActions>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -325,8 +392,7 @@
                                        FontWeight="Bold"
                                        HorizontalAlignment="Center" 
                                        VerticalAlignment="Center" 
-                                       Style="{StaticResource EmptyStateStyle}"
-                                       />
+                                       Style="{StaticResource EmptyStateStyle}"/>
                         </Grid>
                     </Border>
                 </Grid>
