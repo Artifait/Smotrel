@@ -1,1 +1,5 @@
-Покачто master пуст, только [mvp](https://github.com/Artifait/Smotrel/tree/ArtifaitMvp) 
+# View
+## Empty
+![Empty](Smotrel/src/Smotrel_Empty.png)
+## NotEmpty
+![NotEmpty](Smotrel/src/Smotrel_NotEmpty.png)
