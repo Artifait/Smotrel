@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Runtime.Intrinsics.Arm;
+using System.Security.Policy;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -28,7 +31,7 @@ namespace Smotrel
             InitializeComponent();
             Materials = new ObservableCollection<VData>();
 
-            for(int i = 1; i <= 12; i++)
+            for(int i = 1; i <= 0; i++)
             {
                 Materials.Add(new("Akura " + i) { FullPath = "Sati " + Math.Pow(i, 2) });
             }
@@ -62,6 +65,27 @@ namespace Smotrel
         private void MenuButton_Click(object sender, RoutedEventArgs e)
         {
 
+        }
+
+        static int data = 0;
+        private static Random _random = new Random();
+        public static string GenerateRandomString(int maxLength = 30)
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            // Выбираем случайную длину от 1 до 30
+            int length = _random.Next(1, maxLength + 1);
+
+            StringBuilder result = new StringBuilder(length);
+            for (int i = 0; i < length; i++)
+            {
+                result.Append(chars[_random.Next(chars.Length)]);
+            }
+            return result.ToString();
+        }
+
+        private void AddMaterial_Click(object sender, RoutedEventArgs e)
+        {
+            Materials.Add(new() { Name = GenerateRandomString() });
         }
     }
 }

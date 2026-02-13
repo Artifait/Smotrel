@@ -13,99 +13,11 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent">
+
     <Window.Resources>
-        <Style x:Key="ExitBtn" TargetType="Button">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" CornerRadius="0 10 0 0"
-                            BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#7e3e3e"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="CapBtn" TargetType="Button">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" 
-                            BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#4e6e5e"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="EditBtn" TargetType="Button">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" BorderThickness="2 2 0 2" Padding="3"
-                            BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#1e6e5e"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DeleteBtn" TargetType="Button">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" BorderThickness="2 2 2 2" Padding="3"
-                            BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#9e2e3e"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="AddBtn" TargetType="Button">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" BorderThickness="4" Padding="10"
-                            BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter x:Name="Txt" Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#2e2e2e"/>
-                                <Setter TargetName="Txt" Property="TextElement.Foreground" Value="White"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <Style x:Key="SettingsBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -115,287 +27,153 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#4e6e5e"/>
+                                <Setter TargetName="RootBorder" Property="Background" Value="#44ffffff"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="ScrollBarLineButtonStyle" TargetType="{x:Type RepeatButton}">
-            <Setter Property="Focusable" Value="False"/>
+        
+        <Style x:Key="CapBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type RepeatButton}">
-                        <Canvas Height="18">
-                            <Polygon Fill="LightBlue" Points="3,15 15,15 9,3"></Polygon>
-                        </Canvas>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}">
+                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RootBorder" Property="Background" Value="#44ffffff"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <Style x:Key="ScrollBarLineButtonBottomStyle" TargetType="{x:Type RepeatButton}">
-            <Setter Property="Focusable" Value="False"/>
+        <Style x:Key="ExitBtn" TargetType="Button" BasedOn="{StaticResource CapBtn}">
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type RepeatButton}">
-                        <Canvas Height="18">
-                            <Polygon Fill="LightBlue" Points="3,3 9,15 15,3"></Polygon>
-                        </Canvas>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RootBorder" Background="{TemplateBinding Background}" CornerRadius="0 10 0 0">
+                            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RootBorder" Property="Background" Value="#E81123"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-        </Style>
-
-        <Style x:Key="ScrollBarPageButtonStyle" TargetType="{x:Type RepeatButton}">
-            <Setter Property="IsTabStop" Value="False"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type RepeatButton}">
-                        <Border BorderBrush="Transparent"></Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="ScrollBarThumbStyle" TargetType="{x:Type Thumb}">
-            <Setter Property="IsTabStop" Value="False"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="Margin" Value="1,0,1,0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Thumb}">
-                        <Rectangle Fill="White" Margin="0 4 4 4">
-                            <!--<Rectangle.Fill>
-                                --><!-- Создаем кисть, которая будет повторять рисунок --><!--
-                                <VisualBrush TileMode="Tile" Viewport="0,0,10,15" ViewportUnits="Absolute">
-                                    <VisualBrush.Visual>
-                                        <Canvas>
-                                            --><!-- Рисуем одну линию для паттерна --><!--
-                                            <Line X1="0" Y1="15" 
-                                                  X2="10" Y2="0" 
-                                                  Stroke="White" 
-                                                  StrokeThickness="4" />
-                                        </Canvas>
-                                    </VisualBrush.Visual>
-                                </VisualBrush>
-                            </Rectangle.Fill>-->
-                        </Rectangle>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <ControlTemplate x:Key="VerticalScrollBar" TargetType="{x:Type ScrollBar}">
-            <Grid>
-                <Track Name="PART_Track" Width="10"
-                   IsDirectionReversed="True">
-                    <Track.DecreaseRepeatButton>
-                        <RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource ScrollBarPageButtonStyle}">
-                        </RepeatButton>
-                    </Track.DecreaseRepeatButton>
-                    <Track.Thumb>
-                        <Thumb Style="{StaticResource ScrollBarThumbStyle}">
-                        </Thumb>
-                    </Track.Thumb>
-                    <Track.IncreaseRepeatButton>
-                        <RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource ScrollBarPageButtonStyle}">
-                        </RepeatButton>
-                    </Track.IncreaseRepeatButton>
-                </Track>
-            </Grid>
-        </ControlTemplate>
-
-        <Style TargetType="{x:Type ScrollBar}">
-            <Setter Property="Template" Value="{StaticResource VerticalScrollBar}"/>
         </Style>
 
         <Style TargetType="TextBlock" x:Key="EmptyStateStyle">
-            <Style.Setters>
-                <Setter Property="Visibility" Value="Collapsed"/>
-            </Style.Setters>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Setter Property="Margin" Value="0 0 0 40"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Items.Count, ElementName=Data}" Value="0">
                     <Setter Property="Visibility" Value="Visible"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="ScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Rectangle Fill="#44ffffff" Margin="0 2 2 2" RadiusX="1" RadiusY="1"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid>
+                            <Track Name="PART_Track" IsDirectionReversed="True" Margin="0 8 7 8">
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource ScrollBarThumbStyle}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <Border Background="#1e1e1e" BorderThickness="4" BorderBrush="Wheat" CornerRadius="10">
+    <Border Background="#1e1e1e" BorderThickness="1" BorderBrush="#3A3A3A" CornerRadius="10">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="40"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#2d2d2d" MouseLeftButtonDown="Header_Down" CornerRadius="10,10,0,0">
+
+            <Border Grid.Row="0" Background="#2d2d2d" MouseLeftButtonDown="Header_Down" CornerRadius="9,9,0,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="40"/>
-                        <ColumnDefinition Width="40"/>
-                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="120"/>
                     </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="0" Content="&#xE713;" FontFamily="Segoe MDL2 Assets" 
-                        Background="Transparent" BorderBrush="Transparent" 
-                        Foreground="White" Click="MenuButton_Click"  FontSize="25" 
-                        Style="{StaticResource SettingsBtn}"/>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Button Width="40" Content="&#xE713;" FontFamily="Segoe MDL2 Assets" 
+                            Foreground="White" Click="MenuButton_Click" FontSize="18" ToolTip="Настройки"
+                            Style="{StaticResource SettingsBtn}"/>
 
-                    <TextBlock Grid.Column="1" Text="Smotrilka - Offline Player" Padding="5 0 0 0" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="White" FontSize="20" FontWeight="ExtraBlack"/>
+                        <Button Width="40" Content="&#xED0E;" FontFamily="Segoe MDL2 Assets" 
+                            Foreground="White" Click="AddMaterial_Click" FontSize="22" ToolTip="Добавить материал"
+                            Style="{StaticResource CapBtn}"/>
+                        
+                    </StackPanel>
 
-                    <Button Grid.Column="2" Content="&#xE921;" FontFamily="Segoe MDL2 Assets"
-                        Background="Transparent" BorderBrush="Transparent" 
-                        Foreground="White" Click="MinimizeButton_Click"
-                        Style="{StaticResource CapBtn}"/>
+                    <TextBlock Grid.Column="1" Text="Smotrilka - Offline Player" 
+                               VerticalAlignment="Center" Margin="10,0,0,0" 
+                               Foreground="#AAAAAA" FontSize="18" FontWeight="SemiBold"/>
 
-                    <Button Grid.Column="3" Content="&#xE922;" FontFamily="Segoe MDL2 Assets" 
-                        Background="Transparent" BorderBrush="Transparent" 
-                        Foreground="White" Click="MaximizeRestoreButton_Click"
-                        Style="{StaticResource CapBtn}"/>
-
-                    <Button Grid.Column="4" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" 
-                        Background="Transparent" BorderBrush="Transparent" 
-                        Foreground="White" Click="CloseButton_Click" 
-                        Style="{StaticResource ExitBtn}"/>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button Width="40" Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Foreground="White" Click="MinimizeButton_Click" Style="{StaticResource CapBtn}"/>
+                        <Button Width="40" Content="&#xE922;" FontFamily="Segoe MDL2 Assets" Foreground="White" Click="MaximizeRestoreButton_Click" Style="{StaticResource CapBtn}"/>
+                        <Button Width="40" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Foreground="White" Click="CloseButton_Click" Style="{StaticResource ExitBtn}"/>
+                    </StackPanel>
                 </Grid>
             </Border>
+
             <Grid Grid.Row="1">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="80"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                <ScrollViewer Padding="10" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="Data" AlternationCount="1000">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border x:Name="ItemBorder" Margin="0,4,0,0" Padding="10" Background="#242424" CornerRadius="4">
+                                    <TextBlock Text="{Binding Name}" Foreground="WhiteSmoke" FontSize="26"/>
+                                </Border>
 
-                    <Button Margin="4 4 4 0" Background="Transparent" BorderBrush="Wheat" BorderThickness="4"
-                        Foreground="AliceBlue" FontFamily="Tw Cen MT Condensed Extra Bold" FontSize="32"
-                        Style="{StaticResource AddBtn}">
-                        Добавить Материал
-                    </Button>
-                    <Border Grid.Row="1" Margin="4 4 4 4"  BorderBrush="Wheat" BorderThickness="4" CornerRadius="0 0 4 4">
-                        <Grid>
-                            <ScrollViewer Padding="4 0 4 0" VerticalScrollBarVisibility="Auto">
-                                <ItemsControl x:Name="Data" AlternationCount="2">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Margin="4 4 2 4" x:Name="Root" Padding="7">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
+                                <DataTemplate.Triggers>
+                                    <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                                        <Setter TargetName="ItemBorder" Property="Margin" Value="0,0,0,0"/>
+                                    </Trigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
 
-                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Padding="10 0 0 0" Foreground="Wheat" FontSize="24"/>
-                                                    <Button x:Name="Edit"
-                                                            Grid.Column="1"
-                                                            Content="&#xE70F;"
-                                                            FontFamily="Segoe MDL2 Assets"
-                                                            Background="Transparent"
-                                                            Foreground="White" BorderBrush="WhiteSmoke"
-                                                            Click="CloseButton_Click"
-                                                            FontSize="36" Style="{StaticResource EditBtn}"
-                                                            Padding="2"
-                                                            Opacity="0">
-                                                        <Button.RenderTransform>
-                                                            <TranslateTransform X="10"/>
-                                                        </Button.RenderTransform>
-                                                    </Button>
-
-                                                    <Button x:Name="Delete"
-                                                            Grid.Column="2"
-                                                            Content="&#xE74D;"
-                                                            FontFamily="Segoe MDL2 Assets"
-                                                            Background="Transparent" BorderBrush="WhiteSmoke"
-                                                            Foreground="White"  Style="{StaticResource DeleteBtn}"
-                                                            Click="CloseButton_Click"
-                                                            FontSize="36"
-                                                            Padding="2"
-                                                            Opacity="0">
-                                                        <Button.RenderTransform>
-                                                            <TranslateTransform X="10"/>
-                                                        </Button.RenderTransform>
-                                                    </Button>
-                                                </Grid>
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="#1e2e2e"/>
-                                                        <Setter Property="BorderBrush" Value="Transparent"/>
-                                                        <Setter Property="BorderThickness" Value="2"/>
-                                                        
-                                                        <Style.Triggers>
-                                                            <DataTrigger
-                                                                    Binding="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter},
-                                                                    Path=(ItemsControl.AlternationIndex)}" Value="0">
-                                                                <Setter Property="Background" Value="#242424"/>
-                                                            </DataTrigger>
-
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter Property="BorderBrush" Value="White"/>
-                                                            </Trigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                            </Border>
-                                            <DataTemplate.Triggers>
-                                                <Trigger SourceName="Root" Property="IsMouseOver" Value="True">
-                                                    <Trigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="Edit"
-                                                                                 Storyboard.TargetProperty="Opacity"
-                                                                                 To="1" Duration="0:0:0.2"/>
-                                                                <DoubleAnimation Storyboard.TargetName="Delete"
-                                                                                 Storyboard.TargetProperty="Opacity"
-                                                                                 To="1" Duration="0:0:0.2"/>
-                                                                <DoubleAnimation Storyboard.TargetName="Edit"
-                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
-                                                                                 To="0" Duration="0:0:0.2"/>
-                                                                <DoubleAnimation Storyboard.TargetName="Delete"
-                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
-                                                                                 To="0" Duration="0:0:0.2"/>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.EnterActions>
-
-                                                    <Trigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetName="Edit"
-                                                                                 Storyboard.TargetProperty="Opacity"
-                                                                                 To="0" Duration="0:0:0.15"/>
-                                                                <DoubleAnimation Storyboard.TargetName="Delete"
-                                                                                 Storyboard.TargetProperty="Opacity"
-                                                                                 To="0" Duration="0:0:0.15"/>
-                                                                <DoubleAnimation Storyboard.TargetName="Edit"
-                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
-                                                                                 To="10" Duration="0:0:0.15"/>
-                                                                <DoubleAnimation Storyboard.TargetName="Delete"
-                                                                                 Storyboard.TargetProperty="RenderTransform.(TranslateTransform.X)"
-                                                                                 To="10" Duration="0:0:0.15"/>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </Trigger.ExitActions>
-                                                </Trigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                            <TextBlock x:Name="EmptyMessage" 
-                                       Text="Empty" 
-                                       Foreground="Wheat" 
-                                       FontSize="80" Padding="0 0 20 35"
-                                       FontWeight="Bold"
-                                       HorizontalAlignment="Center" 
-                                       VerticalAlignment="Center" 
-                                       Style="{StaticResource EmptyStateStyle}"/>
-                        </Grid>
-                    </Border>
-                </Grid>
+                <TextBlock x:Name="EmptyMessage" 
+                           Text="Empty" 
+                           Foreground="#2d2d2d" 
+                           FontSize="72" 
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center" 
+                           Style="{StaticResource EmptyStateStyle}"/>
             </Grid>
         </Grid>
     </Border>
