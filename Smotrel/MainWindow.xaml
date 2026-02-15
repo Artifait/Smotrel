@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:myCtrls="clr-namespace:Smotrel.Controls"
         mc:Ignorable="d"
         Title="Smotrilka Player" 
         Height="450" 
@@ -152,10 +153,7 @@
                     <ItemsControl x:Name="Data" AlternationCount="1000">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border x:Name="ItemBorder" Margin="0,4,0,0" Padding="10" Background="#242424" CornerRadius="4">
-                                    <TextBlock Text="{Binding Name}" Foreground="WhiteSmoke" FontSize="26"/>
-                                </Border>
-
+                                <myCtrls:CourseCard  x:Name="ItemBorder"  Margin="0,4,0,0" Label="{Binding Name}"/>
                                 <DataTemplate.Triggers>
                                     <Trigger Property="ItemsControl.AlternationIndex" Value="0">
                                         <Setter TargetName="ItemBorder" Property="Margin" Value="0,0,0,0"/>
