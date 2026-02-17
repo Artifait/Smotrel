@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Smotrel.Models
 {
-    class CourseCardModel
+    public class CourseCardModel
     {
         public int Id { get; set; }
         public string Label { get; set; } = string.Empty;

@@ -1,7 +1,7 @@
 ﻿
 namespace Smotrel.Models
 {
-    class CourseModel
+    public class CourseModel
     {
         public int Id { get; set; }
         public string Label { get; set; } = string.Empty;

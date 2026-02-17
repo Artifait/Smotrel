@@ -2,7 +2,7 @@
 
 namespace Smotrel.Models
 {
-    class AppContext : DbContext
+    public class AppContext : DbContext
     {
         public DbSet<CourseCardModel> CourseCards { get; set; }
         public DbSet<CourseCardModel> Courses { get; set; }
