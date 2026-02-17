@@ -1,9 +1,10 @@
 ﻿using Smotrel.Controls;
-using Smotrel.DialogWIndows;
+using Smotrel.DialogWindows;
 using System;
 using System.Collections.ObjectModel;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace Smotrel
@@ -111,6 +112,45 @@ namespace Smotrel
             pastClickedCard = clickedCard;
             
             //MessageBox.Show($"Clicked on: {clickedCard?.Label}");
+        }
+
+        private void OnWindowStateChanged(object sender, EventArgs e)
+        {
+            var templateOfExitBtn = ExitBtn.Template;
+            var templateOfSettingsBtn = SettingsBtn.Template;
+
+            var rootBorderOfExitBtn = templateOfExitBtn.FindName("RootBorder", ExitBtn) as Border;
+            var rootBorderOfSettingsBtn = templateOfSettingsBtn.FindName("RootBorder", SettingsBtn) as Border;
+
+            if (WindowState == WindowState.Maximized)
+            {
+                ColumnOfWindowManagmentBtns.Width = new GridLength(120);
+
+                exitBtnDamper.Width = new GridLength(5);
+                settingsBtnDamper.Width = new GridLength(5);
+                DamperGap.Height = new GridLength(5);
+
+                if (rootBorderOfExitBtn != null)
+                {
+                    rootBorderOfExitBtn.CornerRadius = new CornerRadius(0);
+                    rootBorderOfExitBtn.Width = 40;
+                }
+
+                if (rootBorderOfSettingsBtn != null)
+                    rootBorderOfSettingsBtn.CornerRadius = new CornerRadius(0);
+            }
+            else
+            {
+                exitBtnDamper.Width = new GridLength(0);
+                settingsBtnDamper.Width = new GridLength(0);
+                DamperGap.Height = new GridLength(0);
+
+                if (rootBorderOfExitBtn != null)
+                    rootBorderOfExitBtn.CornerRadius = new CornerRadius(0, 10, 0, 0);
+
+                if (rootBorderOfSettingsBtn != null)
+                    rootBorderOfSettingsBtn.CornerRadius = new CornerRadius(10, 0, 0, 0);
+            }
         }
     }
 }

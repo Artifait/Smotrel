@@ -12,7 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
-namespace Smotrel.DialogWIndows
+namespace Smotrel.DialogWindows
 {
     /// <summary>
     /// Логика взаимодействия для AddCourseWindow.xaml
