@@ -150,7 +150,9 @@
 
             <Grid Grid.Row="1">
                 <ScrollViewer Padding="10" VerticalScrollBarVisibility="Auto"
-                              myCtrls:CourseCard.CardClick="CourseCard_Click">
+                              myCtrls:CourseCard.CardClick="CourseCard_Click"
+                              CanContentScroll="False" PanningMode="VerticalOnly"
+                              PanningDeceleration="0.005" PanningRatio="0.5">
                     <ItemsControl x:Name="Data" AlternationCount="1000">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>

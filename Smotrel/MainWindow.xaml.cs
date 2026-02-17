@@ -84,14 +84,13 @@ namespace Smotrel
 
         private void AddMaterial_Click(object sender, RoutedEventArgs e)
         {
-            AddCourseWindow addCourseWindow = new AddCourseWindow();
+            //AddCourseWindow addCourseWindow = new AddCourseWindow();
 
+            //var result = addCourseWindow.ShowDialog();
+            //if (result == true)
+            //{
 
-            var result = addCourseWindow.ShowDialog();
-            if (result == true)
-            {
-
-            }
+            //}
 
             Materials.Add(new() { Name = GenerateRandomString() });
         }

@@ -46,33 +46,19 @@ namespace Smotrel.Controls
 
             if ((bool)e.NewValue)
             {
-                var drawingGroup = new DrawingGroup();
-
-                var geometryGroup = new GeometryGroup();
-                geometryGroup.Children.Add(new RectangleGeometry(new Rect(0, 0, 50, 50)));
-                geometryGroup.Children.Add(new RectangleGeometry(new Rect(50, 50, 50, 50)));
-
-                var geometryDrawing = new GeometryDrawing
-                {
-                    Brush = new SolidColorBrush(Colors.LightGoldenrodYellow),
-                    Geometry = geometryGroup
-                };
-
-                drawingGroup.Children.Add(geometryDrawing);
-
-                var brush = new DrawingBrush
-                {
-                    Viewport = new Rect(0, 0, 8, 8),
-                    ViewportUnits = BrushMappingMode.Absolute,
-                    TileMode = TileMode.Tile,
-                    Drawing = drawingGroup
-                };
-
-                control.ItemBorder.BorderBrush = brush;
+                control.ItemBorder.UseDashedBorder = true;
             }
             else
             {
-                control.ItemBorder.BorderBrush = control.ItemBorder.Background;
+                control.ItemBorder.UseDashedBorder = false;
+                if(control.ItemBorder.IsMouseOver)
+                {
+                    control.ItemBorder.BorderBrush = new SolidColorBrush(Colors.WhiteSmoke);
+                }
+                else
+                {
+                    control.ItemBorder.BorderBrush = control.ItemBorder.Background;
+                }
             }
         }
 
