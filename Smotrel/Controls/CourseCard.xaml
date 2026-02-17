@@ -1,32 +1,11 @@
-﻿<UserControl x:Class="Smotrel.Controls.CourseCard"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:Smotrel.Controls"
-             mc:Ignorable="d" 
-             d:DesignHeight="200" d:DesignWidth="1000">
+﻿<UserControl x:Class="Smotrel.Controls.CourseCard" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:Smotrel.Controls" mc:Ignorable="d" MouseEnter="HighlightCard" MouseLeave="UnHighlightCard" d:DesignHeight="200" d:DesignWidth="1000">
     <Grid>
         <Border x:Name="ItemBorder" Padding="10" Background="#242424" CornerRadius="4">
             <TextBlock x:Name="labelDisplay" Foreground="WhiteSmoke" FontSize="26"/>
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="BorderThickness" Value="2"/>
-                    <Setter Property="BorderBrush" Value="Transparent"/>
-                    <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="BorderBrush" Value="White"/>
-                        </Trigger>
-                        <EventTrigger RoutedEvent="MouseLeftButtonDown">
-                            <BeginStoryboard>
-                                <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" 
-                                     To="0.5" Duration="0:0:0.1" 
-                                     AutoReverse="True"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Style.Triggers>
+                    <Setter Property="BorderBrush" Value="#242424"/>
                 </Style>
             </Border.Style>
         </Border>

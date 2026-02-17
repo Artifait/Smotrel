@@ -1,11 +1,10 @@
-﻿using System;
+﻿using Smotrel.Controls;
+using Smotrel.DialogWIndows;
+using System;
 using System.Collections.ObjectModel;
-using System.Runtime.Intrinsics.Arm;
-using System.Security.Policy;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Threading;
 
 namespace Smotrel
 {
@@ -85,7 +84,34 @@ namespace Smotrel
 
         private void AddMaterial_Click(object sender, RoutedEventArgs e)
         {
+            AddCourseWindow addCourseWindow = new AddCourseWindow();
+
+
+            var result = addCourseWindow.ShowDialog();
+            if (result == true)
+            {
+
+            }
+
             Materials.Add(new() { Name = GenerateRandomString() });
+        }
+
+        CourseCard? pastClickedCard = null;
+        private void CourseCard_Click(object sender, RoutedEventArgs e)
+        {
+            var clickedCard = e.OriginalSource as CourseCard;
+
+            if(clickedCard != null)
+                clickedCard.IsSelected = !clickedCard.IsSelected;
+
+            if(pastClickedCard != null && clickedCard != null && pastClickedCard != clickedCard)
+            {
+                pastClickedCard.IsSelected = false;
+            }
+
+            pastClickedCard = clickedCard;
+            
+            //MessageBox.Show($"Clicked on: {clickedCard?.Label}");
         }
     }
 }
