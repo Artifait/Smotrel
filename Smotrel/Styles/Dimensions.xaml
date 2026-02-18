@@ -1,4 +1,11 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <CornerRadius x:Key="CornerRadiusWindow">10</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusHeader">9,9,0,0</CornerRadius>
+    <Thickness x:Key="DefaultBorderThickness">1</Thickness>
+    <Thickness x:Key="DefaultPadding">8</Thickness>
+    <sys:Double x:Key="HeaderHeight">40</sys:Double>
+
 </ResourceDictionary>

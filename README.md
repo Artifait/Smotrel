@@ -4,4 +4,7 @@
 ## NotEmpty
 ![NotEmpty](Smotrel/src/Smotrel_NotEmpty.png)
 ## AddCourseWindow
-![AddCourseWindow](Smotrel/src/Smotrel_AddCourseWindow.png)
+### State not selected
+![AddCourseWindowStateNotSelected](Smotrel/src/Smotrel_AddCourseWindow_StateCourseNotSelected.png)
+### State selected
+![AddCourseWindowStateSelected](Smotrel/src/Smotrel_AddCourseWindow_StateCourseSelected.png)

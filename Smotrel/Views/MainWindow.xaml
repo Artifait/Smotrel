@@ -1,0 +1,90 @@
+﻿<Window x:Class="Smotrel.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:myCtrls="clr-namespace:Smotrel.Controls"
+        mc:Ignorable="d"
+        Title="Smotrilka Player" 
+        Height="450" 
+        Width="800"
+        MinWidth="500"
+        MinHeight="350"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        StateChanged="OnWindowStateChanged">
+
+    <Border Background="{StaticResource WindowBackgroundBrush}" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="DamperGap" Height="0"/>
+                <RowDefinition x:Name="GapDefinition" Height="40"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border x:Name="GapWindow" Grid.Row="1" Background="{StaticResource HeaderBackgroundBrush}" MouseLeftButtonDown="Header_Down" CornerRadius="9,9,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="settingsBtnDamper" Width="0"/>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition x:Name="ColumnOfWindowManagmentBtns" Width="120"/>
+                        <ColumnDefinition x:Name="exitBtnDamper" Width="0"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="SettingsBtn" Width="40" Content="&#xE713;" FontFamily="Segoe MDL2 Assets" 
+                            Foreground="{StaticResource GlyphBrush}" Click="MenuButton_Click" FontSize="18" ToolTip="Настройки"
+                            Style="{StaticResource SettingsBtn}"/>
+
+                        <Button Width="40" Content="&#xED0E;" FontFamily="Segoe MDL2 Assets" 
+                            Foreground="{StaticResource GlyphBrush}" Click="AddMaterial_Click" FontSize="22" ToolTip="Добавить курс"
+                            Style="{StaticResource CapBtn}"/>
+
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" Padding="5,0,0,0" Text="Smotrel - Offline Player" 
+                               VerticalAlignment="Center" Margin="10,0,0,0" FontFamily="Rockwell"
+                               Foreground="{StaticResource GlyphBrush}" FontSize="18" FontWeight="SemiBold"/>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal">
+                        <Button Width="40" Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WhiteBrush}" Click="MinimizeButton_Click" Style="{StaticResource CapBtn}"/>
+                        <Button Width="40" Content="&#xE922;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WhiteBrush}" Click="MaximizeRestoreButton_Click" Style="{StaticResource CapBtn}"/>
+                        <Button x:Name="ExitBtn" Width="40" HorizontalAlignment="Center" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WhiteBrush}" Click="CloseButton_Click" Style="{StaticResource ExitBtn}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <ScrollViewer Padding="10" VerticalScrollBarVisibility="Auto"
+                              myCtrls:CourseCard.CardClick="CourseCard_Click"
+                              CanContentScroll="False" PanningMode="VerticalOnly"
+                              PanningDeceleration="0.5" PanningRatio="0.5">
+                    <ItemsControl x:Name="Data" AlternationCount="1000">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <myCtrls:CourseCard  x:Name="ItemBorder"  Margin="0,6,0,0" Label="{Binding Name}"/>
+                                <DataTemplate.Triggers>
+                                    <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                                        <Setter TargetName="ItemBorder" Property="Margin" Value="0,0,0,0"/>
+                                    </Trigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock x:Name="EmptyMessage" 
+                           Text="Empty" 
+                           Foreground="{StaticResource EmptyMessageBrush}" 
+                           FontSize="72" 
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center" 
+                           Style="{StaticResource EmptyStateStyle}"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using Microsoft.Win32;
@@ -129,6 +126,15 @@ namespace Smotrel.DialogWindows
                     MessageBox.Show(this, "Не удалось собрать информацию о курсе: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 OnPropertyChanged(nameof(IsAddEnabled));
+            }
+
+            if(IsAddEnabled)
+            {
+                AddButton.Content = "Добавить курс";
+            }
+            else
+            {
+                AddButton.Content = "Путь не задан";
             }
         }
 
