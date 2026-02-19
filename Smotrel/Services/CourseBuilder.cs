@@ -165,7 +165,7 @@ namespace Smotrel.Services
 
         private static IEnumerable<string> DefaultVideoExtensions()
         {
-            return new[] { ".mp4", ".mkv", ".mov", ".avi", ".wmv", ".flv", ".webm" };
+            return [".mp4", ".mkv", ".mov", ".avi", ".wmv", ".flv", ".webm"];
         }
     }
 }

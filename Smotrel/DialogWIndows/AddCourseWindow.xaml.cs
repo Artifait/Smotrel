@@ -5,6 +5,7 @@ using System.Windows;
 using Microsoft.Win32;
 using Smotrel.Models;
 using Smotrel.Services;
+using Smotrel.Views;
 
 namespace Smotrel.DialogWindows
 {
@@ -96,6 +97,15 @@ namespace Smotrel.DialogWindows
             var res = dlg.ShowDialog();
             if (res == true)
             {
+                if (MainWindow.Context.CourseCardPathExistsAsync(dlg.FolderName).GetAwaiter().GetResult())
+                {
+                    MessageBox.Show(this, "Этот курс уже добавлен.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    OutCourseModel = null;
+                    CourseTitle = string.Empty;
+                    CourseStats = new CourseStatsModel();
+                    IsStatsVisible = false;
+                    return;
+                }
                 SelectedFolderPath = dlg.FolderName;
                 try
                 {

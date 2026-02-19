@@ -60,12 +60,14 @@
             <Grid Grid.Row="2">
                 <ScrollViewer Padding="10" VerticalScrollBarVisibility="Auto"
                               myCtrls:CourseCard.CardClick="CourseCard_Click"
+                              myCtrls:CourseCard.CardDeleteBtnClick="CourseCardDeleteBtn_Click"
+                              myCtrls:CourseCard.CardPlayBtnClick="CourseCardPlayBtn_Click"
                               CanContentScroll="False" PanningMode="VerticalOnly"
                               PanningDeceleration="0.5" PanningRatio="0.5">
                     <ItemsControl x:Name="Data" AlternationCount="1000">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <myCtrls:CourseCard  x:Name="ItemBorder"  Margin="0,6,0,0" Label="{Binding Name}"/>
+                                <myCtrls:CourseCard  x:Name="ItemBorder" Margin="0,6,0,0" Label="{Binding Label}"/>
                                 <DataTemplate.Triggers>
                                     <Trigger Property="ItemsControl.AlternationIndex" Value="0">
                                         <Setter TargetName="ItemBorder" Property="Margin" Value="0,0,0,0"/>

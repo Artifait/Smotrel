@@ -1,5 +1,7 @@
 ﻿using Smotrel.Controls;
 using Smotrel.DialogWindows;
+using Smotrel.Models;
+using System;
 using System.Collections.ObjectModel;
 using System.Text;
 using System.Windows;
@@ -8,33 +10,15 @@ using System.Windows.Input;
 
 namespace Smotrel.Views
 {
-    public class VData
-    {
-        public VData() { }
-        public VData(string name) => Name = name;
-
-        public string Name { get; set; }
-        public string FullPath { get; set; } = "EMPTY";
-
-        public override string ToString()
-        {
-            return Name;
-        }
-    }
-
     public partial class MainWindow : Window
     {
-        public ObservableCollection<VData> Materials { get; set; }
+        public ObservableCollection<CourseCardModel> Materials { get; set; }
+        public static SmotrelContext Context { get; private set; } = new();
         public MainWindow()
         {
             InitializeComponent();
-            Materials = new ObservableCollection<VData>();
 
-            for(int i = 1; i <= 0; i++)
-            {
-                Materials.Add(new("Akura " + i) { FullPath = "Sati " + Math.Pow(i, 2) });
-            }
-
+            Materials = new ObservableCollection<CourseCardModel>(Context.CourseCards);
             Data.ItemsSource = Materials;
         }
 
@@ -84,14 +68,25 @@ namespace Smotrel.Views
 
         private void AddMaterial_Click(object sender, RoutedEventArgs e)
         {
-            AddCourseWindow addCourseWindow = new AddCourseWindow();
+            var addCourseWindow = new AddCourseWindow();
 
             var result = addCourseWindow.ShowDialog();
             if (result == true)
             {
-                Materials.Add(new() { Name = addCourseWindow.OutCourseModel!.Label });
-            }
+                if (addCourseWindow.OutCourseModel != null)
+                {
+                    var model = new CourseCardModel
+                    {
+                        Label = addCourseWindow.OutCourseModel.Label ?? string.Empty,
+                        Path = addCourseWindow.SelectedFolderPath ?? string.Empty
+                    };
 
+                    Context.CourseCards.Add(model);
+                    Context.SaveChanges();
+
+                    Materials.Add(model);
+                }
+            }
         }
 
         CourseCard? pastClickedCard = null;
@@ -149,6 +144,31 @@ namespace Smotrel.Views
                 if (rootBorderOfSettingsBtn != null)
                     rootBorderOfSettingsBtn.CornerRadius = new CornerRadius(10, 0, 0, 0);
             }
+        }
+
+        private void CourseCardDeleteBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var card = e.OriginalSource as CourseCard;
+            if (card == null) return;
+
+            var model = card.DataContext as CourseCardModel;
+            if (model == null) return;
+
+            var deleteCourseWindow = new DeleteCourseWindow(card);
+            var res = deleteCourseWindow.ShowDialog();
+
+            if (res == true)
+            {
+                Materials.Remove(model);
+                Context.CourseCards.Remove(model);
+                Context.SaveChanges();
+            }
+        }
+
+        private void CourseCardPlayBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var card = e.OriginalSource as CourseCard;
+            MessageBox.Show($"Play button clicked on: {card?.Label}");
         }
     }
 }

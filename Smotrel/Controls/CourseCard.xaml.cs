@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Printing;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -24,6 +25,18 @@ namespace Smotrel.Controls
             remove { RemoveHandler(CardClickEvent, value); }
         }
 
+        public event RoutedEventHandler CardDeleteBtnClick
+        {
+            add { AddHandler(CardDeleteBtnClickEvent, value); }
+            remove { RemoveHandler(CardDeleteBtnClickEvent, value); }
+        }
+
+        public event RoutedEventHandler CardPlayBtnClick
+        {
+            add { AddHandler(CardPlayBtnClickEvent, value); }
+            remove { RemoveHandler(CardPlayBtnClickEvent, value); }
+        }
+
         public static readonly DependencyProperty IsSelectedProperty =
             DependencyProperty.Register("IsSelected",
                 typeof(bool), typeof(CourseCard),
@@ -36,6 +49,14 @@ namespace Smotrel.Controls
 
         public static readonly RoutedEvent CardClickEvent = EventManager.RegisterRoutedEvent(
             "CardClick", RoutingStrategy.Bubble,
+            typeof(RoutedEventHandler), typeof(CourseCard));
+
+        public static readonly RoutedEvent CardDeleteBtnClickEvent = EventManager.RegisterRoutedEvent(
+            "CardDeleteBtnClick", RoutingStrategy.Bubble,
+            typeof(RoutedEventHandler), typeof(CourseCard));
+
+        public static readonly RoutedEvent CardPlayBtnClickEvent = EventManager.RegisterRoutedEvent(
+            "CardPlayBtnClick", RoutingStrategy.Bubble,
             typeof(RoutedEventHandler), typeof(CourseCard));
 
         private static void IsSelectedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -74,6 +95,9 @@ namespace Smotrel.Controls
             InitializeComponent();
 
             MouseDown += (s, e) => RaiseEvent(new RoutedEventArgs(CardClickEvent));
+            MouseDoubleClick += (s, e) => RaiseEvent(new RoutedEventArgs(CardPlayBtnClickEvent));
+            PlayBtn.Click += (s, e) => RaiseEvent(new RoutedEventArgs(CardPlayBtnClickEvent));
+            RemoveBtn.Click += (s, e) => RaiseEvent(new RoutedEventArgs(CardDeleteBtnClickEvent));
         }
 
         private void HighlightCard(object sender, System.Windows.Input.MouseEventArgs e)
@@ -98,6 +122,16 @@ namespace Smotrel.Controls
                     card.ItemBorder.BorderBrush = card.ItemBorder.Background;
                 }
             }
+        }
+
+        private void PlayCourse_Click(object sender, RoutedEventArgs e)
+        {
+            
+        }
+
+        private void RemoveCourse_Click(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

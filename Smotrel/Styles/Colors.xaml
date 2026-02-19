@@ -19,4 +19,9 @@
     <Color x:Key="ColorButtonDark">#FF2B2B2B</Color>
     <Color x:Key="ColorEmptyMessage">#FF2D2D2D</Color>
 
+    <Color x:Key="ColorPrimaryHover">#FF006CB3</Color>
+    <Color x:Key="ColorPrimaryPressed">#FF005C99</Color>
+
+    <Color x:Key="ColorDarkHover">#FF323232</Color>
+    <Color x:Key="ColorDarkPressed">#FF1F1F1F</Color>
 </ResourceDictionary>

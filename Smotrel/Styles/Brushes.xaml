@@ -23,4 +23,10 @@
     <SolidColorBrush x:Key="ButtonDarkBrush" Color="{StaticResource ColorButtonDark}"/>
     <SolidColorBrush x:Key="EmptyMessageBrush" Color="{StaticResource ColorEmptyMessage}"/>
 
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource ColorPrimaryHover}"/>
+    <SolidColorBrush x:Key="PrimaryPressedBrush" Color="{StaticResource ColorPrimaryPressed}"/>
+
+    <SolidColorBrush x:Key="DarkHoverBrush" Color="{StaticResource ColorDarkHover}"/>
+    <SolidColorBrush x:Key="DarkPressedBrush" Color="{StaticResource ColorDarkPressed}"/>
+    
 </ResourceDictionary>

@@ -8,3 +8,5 @@
 ![AddCourseWindowStateNotSelected](Smotrel/src/Smotrel_AddCourseWindow_StateCourseNotSelected.png)
 ### State selected
 ![AddCourseWindowStateSelected](Smotrel/src/Smotrel_AddCourseWindow_StateCourseSelected.png)
+## DeleteCourseWindow
+![DeleteCourseWindow](Smotrel/src/Smotrel_DeleteCourseWindow.png)
