@@ -17,7 +17,7 @@
             BorderBrush="{StaticResource BorderBrush}"
             CornerRadius="10">
 
-        <Grid Width="420">
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="40"/>
                 <RowDefinition Height="*"/>

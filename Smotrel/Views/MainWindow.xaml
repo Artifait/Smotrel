@@ -12,15 +12,16 @@
         MinHeight="350"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
+        SizeToContent="WidthAndHeight"
         AllowsTransparency="True"
-        Background="Transparent"
+        Background="Transparent" ResizeMode="CanResizeWithGrip"
         StateChanged="OnWindowStateChanged">
 
     <Border Background="{StaticResource WindowBackgroundBrush}" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="10">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="DamperGap" Height="0"/>
-                <RowDefinition x:Name="GapDefinition" Height="40"/>
+                <RowDefinition x:Name="GapDefinition" Height="0.15*" MinHeight="40" MaxHeight="60"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -47,7 +48,7 @@
 
                     <TextBlock Grid.Column="2" Padding="5,0,0,0" Text="Smotrel - Offline Player" 
                                VerticalAlignment="Center" Margin="10,0,0,0" FontFamily="Rockwell"
-                               Foreground="{StaticResource GlyphBrush}" FontSize="18" FontWeight="SemiBold"/>
+                               Foreground="{StaticResource GlyphBrush}" FontSize="24" FontWeight="SemiBold"/>
 
                     <StackPanel Grid.Column="3" Orientation="Horizontal">
                         <Button Width="40" Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WhiteBrush}" Click="MinimizeButton_Click" Style="{StaticResource CapBtn}"/>
