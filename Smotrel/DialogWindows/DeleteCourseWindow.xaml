@@ -72,7 +72,7 @@
                     <TextBlock Text="{Binding CourseTitle}"
                                x:Name="CourseNameText"
                                Foreground="{StaticResource WhiteBrush}"
-                               FontSize="14"
+                               FontSize="14" TextWrapping="WrapWithOverflow"
                                FontWeight="SemiBold"/>
                 </Border>
             </Grid>

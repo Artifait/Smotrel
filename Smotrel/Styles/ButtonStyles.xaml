@@ -155,7 +155,7 @@
                         Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="4"
+                        CornerRadius="6"
                         SnapsToDevicePixels="True">
                         <ContentPresenter x:Name="contentPresenter"
                                       HorizontalAlignment="Center"

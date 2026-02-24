@@ -8,11 +8,10 @@
         Title="Smotrilka Player" 
         Height="450" 
         Width="800"
-        MinWidth="500"
-        MinHeight="350"
+        MinWidth="540"
+        MinHeight="450"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        SizeToContent="WidthAndHeight"
         AllowsTransparency="True"
         Background="Transparent" ResizeMode="CanResizeWithGrip"
         StateChanged="OnWindowStateChanged">
@@ -21,7 +20,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="DamperGap" Height="0"/>
-                <RowDefinition x:Name="GapDefinition" Height="0.15*" MinHeight="40" MaxHeight="60"/>
+                <RowDefinition x:Name="GapDefinition" Height="45"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -37,7 +36,7 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button x:Name="SettingsBtn" Width="40" Content="&#xE713;" FontFamily="Segoe MDL2 Assets" 
-                            Foreground="{StaticResource GlyphBrush}" Click="MenuButton_Click" FontSize="18" ToolTip="Настройки"
+                            Foreground="{StaticResource GlyphBrush}" Click="SettingsButton_Click" FontSize="18" ToolTip="Настройки"
                             Style="{StaticResource SettingsBtn}"/>
 
                         <Button Width="40" Content="&#xED0E;" FontFamily="Segoe MDL2 Assets" 
@@ -46,7 +45,7 @@
 
                     </StackPanel>
 
-                    <TextBlock Grid.Column="2" Padding="5,0,0,0" Text="Smotrel - Offline Player" 
+                    <TextBlock Grid.Column="2" Padding="5,0,0,0" Text="Smotrel - Offline Player" HorizontalAlignment="Center"
                                VerticalAlignment="Center" Margin="10,0,0,0" FontFamily="Rockwell"
                                Foreground="{StaticResource GlyphBrush}" FontSize="24" FontWeight="SemiBold"/>
 

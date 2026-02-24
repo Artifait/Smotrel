@@ -5,7 +5,7 @@ namespace Smotrel.Models
     public class SmotrelContext : DbContext
     {
         public DbSet<CourseCardModel> CourseCards { get; set; }
-        public DbSet<CourseCardModel> Courses { get; set; }
+        public DbSet<CourseModel> Courses { get; set; }
 
         public SmotrelContext() 
         {

@@ -1,5 +1,4 @@
-﻿using System.Printing;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -122,16 +121,6 @@ namespace Smotrel.Controls
                     card.ItemBorder.BorderBrush = card.ItemBorder.Background;
                 }
             }
-        }
-
-        private void PlayCourse_Click(object sender, RoutedEventArgs e)
-        {
-            
-        }
-
-        private void RemoveCourse_Click(object sender, RoutedEventArgs e)
-        {
-
         }
     }
 }

@@ -7,9 +7,6 @@ namespace Smotrel.Services
 {
     public class CourseBuilder
     {
-        private int _courseId;
-        private int _chapterId;
-        private int _videoId;
         private int _absoluteVideoIndex;
         private readonly HashSet<string> _visitedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private string _courseCoreName = string.Empty;
@@ -34,7 +31,6 @@ namespace Smotrel.Services
 
             var course = new CourseModel
             {
-                Id = Interlocked.Increment(ref _courseId),
                 Label = CleanCourseLabel(rootInfo.Name)
             };
 
@@ -59,7 +55,6 @@ namespace Smotrel.Services
 
             var chapter = new ChapterCourseModel
             {
-                Id = Interlocked.Increment(ref _chapterId),
                 Title = CleanTitle(dir.Name),
                 Path = GetPathForReturn(dirFull, rootFullPath, returnAbsolutePaths)
             };
@@ -92,7 +87,6 @@ namespace Smotrel.Services
                     if (fullFile == null) continue;
                     var video = new VideoModel
                     {
-                        Id = Interlocked.Increment(ref _videoId),
                         Title = CleanTitle(Path.GetFileNameWithoutExtension(f.Name)),
                         Path = GetPathForReturn(fullFile, rootFullPath, returnAbsolutePaths),
                     };

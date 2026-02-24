@@ -1,9 +1,7 @@
 ﻿using Smotrel.Controls;
 using Smotrel.DialogWindows;
 using Smotrel.Models;
-using System;
 using System.Collections.ObjectModel;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -29,7 +27,7 @@ namespace Smotrel.Views
 
         private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
         {
-            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;                
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
@@ -45,26 +43,11 @@ namespace Smotrel.Views
             }
         }
 
-        private void MenuButton_Click(object sender, RoutedEventArgs e)
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
 
         }
 
-        static int data = 0;
-        private static Random _random = new Random();
-        public static string GenerateRandomString(int maxLength = 30)
-        {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            // Выбираем случайную длину от 1 до 30
-            int length = _random.Next(1, maxLength + 1);
-
-            StringBuilder result = new StringBuilder(length);
-            for (int i = 0; i < length; i++)
-            {
-                result.Append(chars[_random.Next(chars.Length)]);
-            }
-            return result.ToString();
-        }
 
         private void AddMaterial_Click(object sender, RoutedEventArgs e)
         {
@@ -75,12 +58,15 @@ namespace Smotrel.Views
             {
                 if (addCourseWindow.OutCourseModel != null)
                 {
+                    var course = addCourseWindow.OutCourseModel;
+
                     var model = new CourseCardModel
                     {
                         Label = addCourseWindow.OutCourseModel.Label ?? string.Empty,
-                        Path = addCourseWindow.SelectedFolderPath ?? string.Empty
+                        Path = addCourseWindow.SelectedFolderPath ?? string.Empty,
+                        Course = course
                     };
-
+                    Context.Courses.Add(course);
                     Context.CourseCards.Add(model);
                     Context.SaveChanges();
 
@@ -103,8 +89,6 @@ namespace Smotrel.Views
             }
 
             pastClickedCard = clickedCard;
-            
-            //MessageBox.Show($"Clicked on: {clickedCard?.Label}");
         }
 
         private void OnWindowStateChanged(object sender, EventArgs e)
@@ -168,7 +152,20 @@ namespace Smotrel.Views
         private void CourseCardPlayBtn_Click(object sender, RoutedEventArgs e)
         {
             var card = e.OriginalSource as CourseCard;
-            MessageBox.Show($"Play button clicked on: {card?.Label}");
+            if (card == null) return;
+
+            var model = card.DataContext as CourseCardModel;
+            if (model == null) return;
+
+            if (model.Course == null)
+            {
+                Context.Entry(model).Reference(m => m.Course).Load();
+            }
+
+            var MainPlayWindow = new MainPlayer(model.Course!);
+            MainPlayWindow.Show();
+
+            Close();
         }
     }
 }

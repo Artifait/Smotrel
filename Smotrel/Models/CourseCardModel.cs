@@ -7,6 +7,9 @@ namespace Smotrel.Models
         public string Label { get; set; } = string.Empty;
         public string Path { get; set; } = string.Empty;
 
+        public int CourseId { get; set; }
+        public CourseModel Course { get; set; } = null!;
+
         public override string ToString()
         {
             return Label;

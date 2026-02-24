@@ -25,12 +25,12 @@
                     <Button x:Name="PlayBtn" Width="40" Height="40" FontSize="24" 
                         Content="&#xE768;" FontFamily="Segoe MDL2 Assets"
                         Foreground="{StaticResource GlyphBrush}"
-                        Click="PlayCourse_Click" Style="{StaticResource CourseCardButtonStyle}"/>
+                        Style="{StaticResource CourseCardButtonStyle}"/>
 
                     <Button x:Name="RemoveBtn" Width="40" Height="40" Content="&#xE74D;" 
                             FontFamily="Segoe MDL2 Assets" FontSize="24" Margin="10,0,0,0"
                             Foreground="{StaticResource GlyphBrush}" 
-                            Click="RemoveCourse_Click" Style="{StaticResource CourseCardButtonStyle}"/>
+                            Style="{StaticResource CourseCardButtonStyle}"/>
                 </StackPanel>
             </Grid>
         </local:DashedBorder>
