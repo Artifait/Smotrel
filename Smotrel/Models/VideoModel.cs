@@ -1,4 +1,6 @@
 ﻿
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Smotrel.Models
 {
     public class VideoModel : IVideo
@@ -12,6 +14,8 @@ namespace Smotrel.Models
         public TimeSpan Duration { get; set; } = TimeSpan.Zero;
         public bool IsWatched { get; set; } = false;
         public TimeSpan LastPosition { get; set; } = TimeSpan.Zero;
+
+        [NotMapped]
         public List<VideoTimestamp> Timestamps { get; set; } = [];
     }
 }

@@ -121,6 +121,7 @@ namespace Smotrel.Services
                 if (child != null)
                 {
                     child.RelativeIndex = chapter.Chapters.Count;
+                    child.Parent = chapter;
                     chapter.Chapters.Add(child);
                 }
             }
