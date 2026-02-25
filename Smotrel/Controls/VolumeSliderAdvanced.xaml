@@ -1,0 +1,70 @@
+﻿<UserControl x:Class="Smotrel.Controls.VolumeSliderAdvanced"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="root"
+             Height="32"
+             Background="Transparent">
+
+    <Grid VerticalAlignment="Center">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+            <Viewbox Width="20" Height="20" VerticalAlignment="Center">
+                <Grid>
+                    <Path x:Name="PART_IconPath"
+                          Data="{Binding CurrentIconGeometry, ElementName=root}"
+                          Stretch="Uniform"
+                          Visibility="Collapsed"
+                          RenderTransformOrigin="0.5,0.5">
+                        <Path.RenderTransform>
+                            <ScaleTransform x:Name="PART_IconScale" ScaleX="1" ScaleY="1"/>
+                        </Path.RenderTransform>
+                        <Path.Fill>
+                            <SolidColorBrush Color="#FFCC00"/>
+                        </Path.Fill>
+                    </Path>
+
+                    <TextBlock x:Name="PART_IconText"
+                               Text="{Binding CurrentIconText, ElementName=root}"
+                               FontSize="16"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="#FFCC00"
+                               Visibility="Collapsed"/>
+                </Grid>
+            </Viewbox>
+        </StackPanel>
+
+        <Grid Grid.Column="1" x:Name="PART_Root" Background="Transparent"
+              MouseLeftButtonDown="Root_MouseLeftButtonDown"
+              MouseMove="Root_MouseMove"
+              MouseLeftButtonUp="Root_MouseLeftButtonUp">
+
+            <Border x:Name="PART_Track"
+                    Height="6"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Stretch"
+                    CornerRadius="3"
+                    Background="#333"/>
+
+            <Border x:Name="PART_Fill"
+                    Height="6"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Left"
+                    CornerRadius="3"
+                    Background="#FFCC00"
+                    Width="0"/>
+
+            <Canvas x:Name="PART_ThumbCanvas" IsHitTestVisible="False"
+                    VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                <Ellipse x:Name="PART_Thumb" Width="12" Height="12"
+                         Fill="#FFCC00"
+                         Stroke="#222"
+                         StrokeThickness="1"/>
+            </Canvas>
+        </Grid>
+    </Grid>
+</UserControl>
