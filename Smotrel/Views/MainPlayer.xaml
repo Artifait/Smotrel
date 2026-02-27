@@ -4,66 +4,154 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Smotrel.Views"
-        xmlns:myCtrls="clr-namespace:Smotrel.Controls"
+        xmlns:ctrls="clr-namespace:Smotrel.Controls"
         mc:Ignorable="d"
-        Title="Smotrilka Player" 
+        Title="Smotrilka Player"
         Height="450" MinHeight="400"
-        Width="800" MinWidth="600"
+        Width="800" MinWidth="620"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True" WindowState="Maximized"
         Background="Transparent" ResizeMode="CanResizeWithGrip"
         StateChanged="OnWindowStateChanged">
 
-    <Border Background="{StaticResource WindowBackgroundBrush}" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="10">
+    <Border Background="{StaticResource WindowBackgroundBrush}"
+            BorderThickness="1"
+            BorderBrush="{StaticResource BorderBrush}"
+            CornerRadius="10">
         <Grid>
+
+            <!-- ═══ Обычный режим ═══════════════════════════════════════════════ -->
             <Grid x:Name="NoFullScreen">
                 <Grid.RowDefinitions>
-                    <RowDefinition x:Name="DamperGap" Height="0"/>
+                    <RowDefinition x:Name="DamperGap"     Height="0"/>
                     <RowDefinition x:Name="GapDefinition" Height="45"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Border x:Name="GapWindow" Grid.Row="1" Background="{StaticResource HeaderBackgroundBrush}" MouseLeftButtonDown="Header_Down" CornerRadius="9,9,0,0">
+                <!-- ── Заголовок ──────────────────────────────────────────── -->
+                <Border x:Name="GapWindow"
+                        Grid.Row="1"
+                        Background="{StaticResource HeaderBackgroundBrush}"
+                        MouseLeftButtonDown="Header_Down"
+                        CornerRadius="9,9,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition x:Name="backBtnDamper" Width="0"/>
+                            <ColumnDefinition x:Name="backBtnDamper"               Width="0"/>
                             <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition x:Name="ColumnOfWindowManagmentBtns" Width="120"/>
-                            <ColumnDefinition x:Name="exitBtnDamper" Width="0"/>
+                            <ColumnDefinition x:Name="exitBtnDamper"               Width="0"/>
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button x:Name="BackBtn" Width="40" Content="&#xF0D5;" FontFamily="Segoe MDL2 Assets" 
-                                Foreground="{StaticResource GlyphBrush}" Click="BackButton_Click" FontSize="18" ToolTip="Главное меню"
-                                Style="{StaticResource SettingsBtn}"/>
-
-                            <Button Width="40" Content="&#xE8B9;" FontFamily="Segoe MDL2 Assets" 
-                                Foreground="{StaticResource GlyphBrush}" Click="PipButton_Click" FontSize="22" ToolTip="Режим(Картинка в картинке)"
-                                Style="{StaticResource CapBtn}"/>
-
+                            <Button x:Name="BackBtn"
+                                    Width="40" Content="&#xF0D5;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    Foreground="{StaticResource GlyphBrush}"
+                                    Click="BackButton_Click" FontSize="18"
+                                    ToolTip="Главное меню"
+                                    Style="{StaticResource SettingsBtn}"/>
+                            <Button Width="40" Content="&#xE8B9;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    Foreground="{StaticResource GlyphBrush}"
+                                    Click="PipButton_Click" FontSize="22"
+                                    ToolTip="Картинка в картинке"
+                                    Style="{StaticResource CapBtn}"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="GapTitle" Grid.Column="2" Padding="5,0,0,0" Text="Smotrel - CourseTitle" HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" Margin="10,0,0,0" FontFamily="Rockwell" TextTrimming="CharacterEllipsis"
-                                   Foreground="{StaticResource GlyphBrush}" FontSize="24" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="GapTitle"
+                                   Grid.Column="2"
+                                   Padding="5,0,0,0"
+                                   Text="Smotrel - CourseTitle"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Rockwell"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource GlyphBrush}"
+                                   FontSize="24" FontWeight="SemiBold"/>
 
                         <StackPanel Grid.Column="3" Orientation="Horizontal">
-                            <Button Width="40" Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WhiteBrush}" Click="MinimizeButton_Click" Style="{StaticResource CapBtn}"/>
-                            <Button Width="40" Content="&#xE922;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WhiteBrush}" Click="MaximizeRestoreButton_Click" Style="{StaticResource CapBtn}"/>
-                            <Button x:Name="ExitBtn" Width="40" HorizontalAlignment="Center" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WhiteBrush}" Click="CloseButton_Click" Style="{StaticResource ExitBtn}"/>
+                            <Button Width="40" Content="&#xE921;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    Foreground="{StaticResource WhiteBrush}"
+                                    Click="MinimizeButton_Click"
+                                    Style="{StaticResource CapBtn}"/>
+                            <Button Width="40" Content="&#xE922;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    Foreground="{StaticResource WhiteBrush}"
+                                    Click="MaximizeRestoreButton_Click"
+                                    Style="{StaticResource CapBtn}"/>
+                            <Button x:Name="ExitBtn"
+                                    Width="40" HorizontalAlignment="Center"
+                                    Content="&#xE8BB;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    Foreground="{StaticResource WhiteBrush}"
+                                    Click="CloseButton_Click"
+                                    Style="{StaticResource ExitBtn}"/>
                         </StackPanel>
                     </Grid>
                 </Border>
 
+                <!-- ── Контент ────────────────────────────────────────────── -->
+                <!--
+                    Col 0: Боковая навигация (реализуем в следующем этапе)
+                    Col 1: GridSplitter
+                    Col 2: SmotrelPlayer
+                -->
                 <Grid Grid.Row="2">
-                    <!--Здесь будет отображаться видео плеер, навигационное меню и прочая информация о курсе, а также прогресс его прохождения.-->
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="SidebarColumn" Width="280" MinWidth="180"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"   MinWidth="320"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- SmotrelPlayer -->
+                    <ctrls:SmotrelPlayer
+                        x:Name="Player"
+                        Grid.Column="2"
+                        OverlayTimeout="00:00:03"
+                        PlaybackStateChanged="Player_PlaybackStateChanged"
+                        PlaybackEnded="Player_PlaybackEnded"
+                        PreviousRequested="Player_PreviousRequested"
+                        NextRequested="Player_NextRequested"
+                        VolumeChangedRouted="Player_VolumeChanged"
+                        VideoWindowStateChanged="Player_WindowStateChanged"/>
+
+                    <!-- Разделитель -->
+                    <GridSplitter Grid.Column="1"
+                                  Width="8"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Stretch"
+                                  Background="{StaticResource BorderBrush}"
+                                  Cursor="SizeWE"
+                                  ResizeBehavior="PreviousAndNext"/>
+
+                    <!-- Боковая панель (placeholder) -->
+                    <Border x:Name="Sidebar"
+                            Grid.Column="0"
+                            Background="{StaticResource StatsPanelBackgroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1,0,0,0">
+                        <TextBlock Text="Навигация по курсу"
+                                   Foreground="{StaticResource EmptyMessageBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="14" FontFamily="Arial"
+                                   FontStyle="Italic"/>
+                    </Border>
                 </Grid>
             </Grid>
-            <Grid x:Name="FullScreen" Visibility="Collapsed">
-                <!--Тут только видео плеер.-->
-            </Grid>
+
+            <!-- ═══ Fullscreen-контейнер (Reparenting) ═══════════════════════ -->
+            <!--
+                SmotrelPlayer перемещается сюда при VideoWindowState=Maximized.
+                NoFullScreen при этом скрыт — заголовок и панель не видны.
+                При возврате в Normal — SmotrelPlayer возвращается в Col 0.
+            -->
+            <Grid x:Name="FullScreen" Visibility="Collapsed"/>
+
         </Grid>
     </Border>
 </Window>

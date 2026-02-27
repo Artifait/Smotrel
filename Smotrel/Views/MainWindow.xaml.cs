@@ -1,4 +1,5 @@
-﻿using Smotrel.Controls;
+﻿using Microsoft.EntityFrameworkCore;
+using Smotrel.Controls;
 using Smotrel.DialogWindows;
 using Smotrel.Models;
 using System.Collections.ObjectModel;
@@ -151,19 +152,42 @@ namespace Smotrel.Views
 
         private void CourseCardPlayBtn_Click(object sender, RoutedEventArgs e)
         {
-            var card = e.OriginalSource as CourseCard;
-            if (card == null) return;
+            if (e.OriginalSource is not CourseCard card) return;
+            if (card.DataContext is not CourseCardModel model) return;
 
-            var model = card.DataContext as CourseCardModel;
-            if (model == null) return;
+            var courseId = model.CourseId;
 
-            if (model.Course == null)
+            var course = Context.Courses
+                .Include(c => c.MainChapter)
+                .AsSplitQuery()
+                .SingleOrDefault(c => c.Id == courseId);
+
+            if (course?.MainChapter == null) return;
+
+            void LoadChapterTree(ChapterCourseModel chapter)
             {
-                Context.Entry(model).Reference(m => m.Course).Load();
+                Context.Entry(chapter)
+                    .Collection(c => c.Videos)
+                    .Query()
+                    .OrderBy(v => v.RelativeIndex)
+                    .Load();
+
+                Context.Entry(chapter)
+                    .Collection(c => c.Chapters)
+                    .Query()
+                    .OrderBy(c => c.RelativeIndex)
+                    .Load();
+
+                foreach (var child in chapter.Chapters)
+                {
+                    LoadChapterTree(child);
+                }
             }
 
-            var MainPlayWindow = new MainPlayer(model.Course!);
-            MainPlayWindow.Show();
+            LoadChapterTree(course.MainChapter);
+
+            var mainPlayWindow = new MainPlayer(course);
+            mainPlayWindow.Show();
 
             Close();
         }
