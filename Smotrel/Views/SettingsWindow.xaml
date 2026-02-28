@@ -1,0 +1,217 @@
+<Window x:Class="Smotrel.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Настройки"
+        Width="480" SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStartupLocation="CenterOwner">
+
+    <Border Background="{StaticResource WindowBackgroundBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Заголовок -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource HeaderBackgroundBrush}"
+                    CornerRadius="9,9,0,0"
+                    MouseLeftButtonDown="Header_Down">
+                <Grid>
+                    <TextBlock Text="Настройки"
+                               Foreground="{StaticResource GlyphBrush}"
+                               FontFamily="Rockwell" FontSize="18"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Button HorizontalAlignment="Right"
+                            Width="40" Content="&#xE8BB;"
+                            FontFamily="Segoe MDL2 Assets"
+                            Foreground="{StaticResource WhiteBrush}"
+                            Click="CloseButton_Click"
+                            Style="{StaticResource ExitBtn}"/>
+                </Grid>
+            </Border>
+
+            <!-- Контент -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,20,24,24">
+
+                    <!-- ── Папка курсов ──────────────────────────────────── -->
+                    <TextBlock Text="Папка с курсами"
+                               Foreground="{StaticResource GlyphBrush}"
+                               FontFamily="Arial" FontSize="15" FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TbCoursesFolder" Grid.Column="0"
+                                 Background="{StaticResource ButtonDarkBrush}"
+                                 Foreground="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 BorderThickness="1" Padding="8,6"
+                                 FontFamily="Arial" FontSize="12"/>
+                        <Button Grid.Column="2" Content="Обзор"
+                                Width="70" Click="BrowseCoursesFolder_Click"
+                                Style="{StaticResource DarkButtonStyle}"
+                                Foreground="{StaticResource GlyphBrush}"/>
+                    </Grid>
+
+                    <!-- ── Воспроизведение ───────────────────────────────── -->
+                    <TextBlock Text="Воспроизведение"
+                               Foreground="{StaticResource GlyphBrush}"
+                               FontFamily="Arial" FontSize="15" FontWeight="SemiBold"
+                               Margin="0,0,0,12"/>
+
+                    <!-- Оверлей -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="90"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Таймаут скрытия панели управления (сек)"
+                                   Foreground="{StaticResource LightGrayBrush}"
+                                   FontFamily="Arial" FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <TextBox x:Name="TbOverlayTimeout" Grid.Column="1"
+                                 Background="{StaticResource ButtonDarkBrush}"
+                                 Foreground="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 BorderThickness="1" Padding="8,4"
+                                 FontFamily="Arial" FontSize="13"
+                                 TextAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Перемотка назад -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="90"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Перемотка назад (сек, стрелка ←)"
+                                   Foreground="{StaticResource LightGrayBrush}"
+                                   FontFamily="Arial" FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <TextBox x:Name="TbSeekBack" Grid.Column="1"
+                                 Background="{StaticResource ButtonDarkBrush}"
+                                 Foreground="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 BorderThickness="1" Padding="8,4"
+                                 FontFamily="Arial" FontSize="13"
+                                 TextAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Перемотка вперёд -->
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="90"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Перемотка вперёд (сек, стрелка →)"
+                                   Foreground="{StaticResource LightGrayBrush}"
+                                   FontFamily="Arial" FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <TextBox x:Name="TbSeekFwd" Grid.Column="1"
+                                 Background="{StaticResource ButtonDarkBrush}"
+                                 Foreground="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 BorderThickness="1" Padding="8,4"
+                                 FontFamily="Arial" FontSize="13"
+                                 TextAlignment="Center"/>
+                    </Grid>
+
+                    <!-- ── Горячие клавиши ───────────────────────────────── -->
+                    <TextBlock Text="Горячие клавиши"
+                               Foreground="{StaticResource GlyphBrush}"
+                               FontFamily="Arial" FontSize="15" FontWeight="SemiBold"
+                               Margin="0,0,0,12"/>
+
+                    <!-- Шаблон строки горячей клавиши -->
+                    <!-- Пауза/воспроизведение -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Пауза / Воспроизведение"
+                                   Foreground="{StaticResource LightGrayBrush}"
+                                   FontFamily="Arial" FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <TextBox x:Name="HkPlayPause" Grid.Column="1"
+                                 Background="{StaticResource ButtonDarkBrush}"
+                                 Foreground="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 BorderThickness="1" Padding="8,4"
+                                 FontFamily="Arial" FontSize="13"
+                                 TextAlignment="Center"
+                                 PreviewKeyDown="Hotkey_PreviewKeyDown"
+                                 Tag="HotkeyPlayPause"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Полный экран"
+                                   Foreground="{StaticResource LightGrayBrush}"
+                                   FontFamily="Arial" FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <TextBox x:Name="HkFullscreen" Grid.Column="1"
+                                 Background="{StaticResource ButtonDarkBrush}"
+                                 Foreground="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 BorderThickness="1" Padding="8,4"
+                                 FontFamily="Arial" FontSize="13"
+                                 TextAlignment="Center"
+                                 PreviewKeyDown="Hotkey_PreviewKeyDown"
+                                 Tag="HotkeyFullscreen"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Картинка в картинке"
+                                   Foreground="{StaticResource LightGrayBrush}"
+                                   FontFamily="Arial" FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <TextBox x:Name="HkPiP" Grid.Column="1"
+                                 Background="{StaticResource ButtonDarkBrush}"
+                                 Foreground="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 BorderThickness="1" Padding="8,4"
+                                 FontFamily="Arial" FontSize="13"
+                                 TextAlignment="Center"
+                                 PreviewKeyDown="Hotkey_PreviewKeyDown"
+                                 Tag="HotkeyPiP"/>
+                    </Grid>
+
+                    <!-- Сохранить -->
+                    <Button Content="Сохранить"
+                            Height="38"
+                            Margin="0,20,0,0"
+                            Click="SaveButton_Click"
+                            Style="{StaticResource DarkButtonStyle}"
+                            Foreground="{StaticResource GlyphBrush}"
+                            FontSize="14"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

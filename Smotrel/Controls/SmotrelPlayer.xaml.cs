@@ -2,6 +2,7 @@ using Smotrel.Enums;
 using Smotrel.Events;
 using Smotrel.Interfaces;
 using Smotrel.Models;
+using Smotrel.Settings;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
@@ -17,38 +18,16 @@ namespace Smotrel.Controls
     {
         // ── Внутреннее состояние ──────────────────────────────────────────────
 
-        /// <summary>
-        /// Таймер для скрытия оверлея управления.
-        /// Сбрасывается при каждом движении мыши.
-        /// </summary>
         private readonly DispatcherTimer _overlayTimer = new();
-
-        /// <summary>
-        /// Таймер для обновления позиции таймлайна и временной метки во время воспроизведения.
-        /// Тикает каждые 250 мс.
-        /// </summary>
         private readonly DispatcherTimer _positionTimer = new();
+        private readonly DispatcherTimer _scrubEndTimer = new();
 
-        /// <summary>Список таймкодов текущего видео.</summary>
         private IList<ITimecode> _timecodes = new List<ITimecode>();
-
-        /// <summary>Состояние до блокировки — восстанавливается при разблокировке.</summary>
         private PlayerState _stateBeforeLock = PlayerState.Paused;
-
-        /// <summary>Громкость до mute — восстанавливается при снятии mute.</summary>
         private double _volumeBeforeMute = 1.0;
-
-        /// <summary>Текущая скорость воспроизведения.</summary>
         private double _playbackSpeed = 1.0;
-
-        /// <summary>Флаг: пользователь тащит таймлайн — не обновляем позицию из Media.</summary>
         private bool _isScrubbing;
-
-        // Для Reparenting (Fullscreen / Normal)
-        private Panel?  _originalParent;
-        private int     _originalChildIndex;
-        private Window? _fullscreenWindow;
-        private Window? _pipWindow;
+        private double _volumeBeforeScrub = 1.0; // для mute во время скраббинга
 
         // ── Конструктор ───────────────────────────────────────────────────────
 
@@ -56,25 +35,24 @@ namespace Smotrel.Controls
         {
             InitializeComponent();
 
-            // Оверлей-таймер
             _overlayTimer.Tick += OverlayTimer_Tick;
-
-            // Позиция-таймер
-            _positionTimer.Interval = TimeSpan.FromMilliseconds(250);
-            _positionTimer.Tick    += PositionTimer_Tick;
-
-            // Применяем дефолтный OverlayTimeout из DP
             _overlayTimer.Interval = OverlayTimeout;
 
-            // Мышь
-            MouseMove  += OnMouseActivity;
-            MouseDown  += OnMouseActivity;
+            _positionTimer.Interval = TimeSpan.FromMilliseconds(250);
+            _positionTimer.Tick += PositionTimer_Tick;
 
-            // Начальные значения UI
+            // Таймер завершения скраббинга — восстанавливает звук через 120ms
+            // после последнего движения ползунка
+            _scrubEndTimer.Interval = TimeSpan.FromMilliseconds(120);
+            _scrubEndTimer.Tick += ScrubEndTimer_Tick;
+
+            MouseMove += OnMouseActivity;
+            MouseDown += OnMouseActivity;
+
             VolumeBar.Value = Volume;
             UpdateVolumeGlyph();
 
-            Loaded += (_, _) => ShowOverlay();
+            Loaded += (_, _) => { ShowOverlay(); Focus(); };
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -84,9 +62,8 @@ namespace Smotrel.Controls
         // ── FilePath ─────────────────────────────────────────────────────────
 
         public static readonly DependencyProperty FilePathProperty =
-            DependencyProperty.Register(
-                nameof(FilePath), typeof(string), typeof(SmotrelPlayer),
-                new PropertyMetadata(null, OnFilePathChanged));
+            DependencyProperty.Register(nameof(FilePath), typeof(string),
+                typeof(SmotrelPlayer), new PropertyMetadata(null, OnFilePathChanged));
 
         public string? FilePath
         {
@@ -98,22 +75,16 @@ namespace Smotrel.Controls
         {
             var p = (SmotrelPlayer)d;
             if (e.NewValue is string path && !string.IsNullOrWhiteSpace(path))
-            {
                 p.Media.Source = new Uri(path);
-                // MediaOpened запустит воспроизведение
-            }
             else
-            {
                 p.Media.Source = null;
-            }
         }
 
         // ── Title ────────────────────────────────────────────────────────────
 
         public static readonly DependencyProperty TitleProperty =
-            DependencyProperty.Register(
-                nameof(Title), typeof(string), typeof(SmotrelPlayer),
-                new PropertyMetadata(string.Empty, OnTitleChanged));
+            DependencyProperty.Register(nameof(Title), typeof(string),
+                typeof(SmotrelPlayer), new PropertyMetadata(string.Empty, OnTitleChanged));
 
         public new string Title
         {
@@ -127,9 +98,8 @@ namespace Smotrel.Controls
         // ── CurrentTime ──────────────────────────────────────────────────────
 
         public static readonly DependencyProperty CurrentTimeProperty =
-            DependencyProperty.Register(
-                nameof(CurrentTime), typeof(TimeSpan), typeof(SmotrelPlayer),
-                new PropertyMetadata(TimeSpan.Zero, OnCurrentTimeChanged));
+            DependencyProperty.Register(nameof(CurrentTime), typeof(TimeSpan),
+                typeof(SmotrelPlayer), new PropertyMetadata(TimeSpan.Zero, OnCurrentTimeChanged));
 
         public TimeSpan CurrentTime
         {
@@ -139,15 +109,10 @@ namespace Smotrel.Controls
 
         private static void OnCurrentTimeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            var p   = (SmotrelPlayer)d;
+            var p = (SmotrelPlayer)d;
             var pos = (TimeSpan)e.NewValue;
-
-            // Синхронизируем MediaElement если не скраббинг
             if (!p._isScrubbing && p.Media.NaturalDuration.HasTimeSpan)
-            {
                 p.Media.Position = pos;
-            }
-
             p.UpdateTimeLabel(pos);
             p.UpdateChapterLabel(pos);
             p.UpdateTimelineValue(pos);
@@ -156,10 +121,10 @@ namespace Smotrel.Controls
         // ── Volume ───────────────────────────────────────────────────────────
 
         public static readonly DependencyProperty VolumeProperty =
-            DependencyProperty.Register(
-                nameof(Volume), typeof(double), typeof(SmotrelPlayer),
+            DependencyProperty.Register(nameof(Volume), typeof(double),
+                typeof(SmotrelPlayer),
                 new PropertyMetadata(1.0, OnVolumeChanged),
-                v => (double)v >= 0.0 && (double)v <= 1.0);
+                v => (double)v is >= 0.0 and <= 1.0);
 
         public double Volume
         {
@@ -170,17 +135,16 @@ namespace Smotrel.Controls
         private static void OnVolumeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var p = (SmotrelPlayer)d;
-            p.Media.Volume      = (double)e.NewValue;
-            p.VolumeBar.Value   = (double)e.NewValue;
+            p.Media.Volume = (double)e.NewValue;
+            p.VolumeBar.Value = (double)e.NewValue;
             p.UpdateVolumeGlyph();
         }
 
         // ── IsMuted ──────────────────────────────────────────────────────────
 
         public static readonly DependencyProperty IsMutedProperty =
-            DependencyProperty.Register(
-                nameof(IsMuted), typeof(bool), typeof(SmotrelPlayer),
-                new PropertyMetadata(false, OnIsMutedChanged));
+            DependencyProperty.Register(nameof(IsMuted), typeof(bool),
+                typeof(SmotrelPlayer), new PropertyMetadata(false, OnIsMutedChanged));
 
         public bool IsMuted
         {
@@ -190,31 +154,29 @@ namespace Smotrel.Controls
 
         private static void OnIsMutedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            var p      = (SmotrelPlayer)d;
-            bool muted = (bool)e.NewValue;
-
-            if (muted)
+            var p = (SmotrelPlayer)d;
+            bool on = (bool)e.NewValue;
+            if (on)
             {
                 p._volumeBeforeMute = p.Volume;
-                p.Media.Volume      = 0;
-                p.VolumeBar.Value   = 0;
+                p.Media.Volume = 0;
+                p.VolumeBar.Value = 0;
             }
             else
             {
-                p.Volume          = p._volumeBeforeMute;
-                p.Media.Volume    = p._volumeBeforeMute;
+                p.Volume = p._volumeBeforeMute;
+                p.Media.Volume = p._volumeBeforeMute;
                 p.VolumeBar.Value = p._volumeBeforeMute;
             }
-
             p.UpdateVolumeGlyph();
         }
 
         // ── PlayerState ──────────────────────────────────────────────────────
 
         public static readonly DependencyProperty PlayerStateProperty =
-            DependencyProperty.Register(
-                nameof(PlayerState), typeof(PlayerState), typeof(SmotrelPlayer),
-                new PropertyMetadata(PlayerState.Paused, OnPlayerStateChanged));
+            DependencyProperty.Register(nameof(PlayerState), typeof(PlayerState),
+                typeof(SmotrelPlayer),
+                new PropertyMetadata(PlayerState.Playing, OnPlayerStateChanged));
 
         public PlayerState PlayerState
         {
@@ -224,7 +186,7 @@ namespace Smotrel.Controls
 
         private static void OnPlayerStateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            var p        = (SmotrelPlayer)d;
+            var p = (SmotrelPlayer)d;
             var oldState = (PlayerState)e.OldValue;
             var newState = (PlayerState)e.NewValue;
 
@@ -232,64 +194,71 @@ namespace Smotrel.Controls
             {
                 p.Media.Play();
                 p._positionTimer.Start();
-                p.GlyphPlayPause.Text = "\uE769"; // Pause glyph
+                p.GlyphPlayPause.Text = "\uE769";
             }
             else
             {
                 p.Media.Pause();
                 p._positionTimer.Stop();
-                p.GlyphPlayPause.Text = "\uE768"; // Play glyph
+                p.GlyphPlayPause.Text = "\uE768";
             }
 
-            // Запускаем анимацию центрального глифа
             p.RunPlayStateAnimation(newState);
-
-            // Поднимаем событие
-            p.RaiseEvent(new PlayerStateChangedEventArgs(
-                PlaybackStateChangedEvent, oldState, newState));
+            p.RaiseEvent(new PlayerStateChangedEventArgs(PlaybackStateChangedEvent, oldState, newState));
         }
 
-        // ── VideoWindowState ─────────────────────────────────────────────────
+        // ── PlayerMode — управляет видимостью кнопок ─────────────────────────
 
-        public static readonly DependencyProperty VideoWindowStateProperty =
-            DependencyProperty.Register(
-                nameof(VideoWindowState), typeof(VideoWindowState), typeof(SmotrelPlayer),
-                new PropertyMetadata(VideoWindowState.Normal, OnVideoWindowStateChanged));
+        public static readonly DependencyProperty PlayerModeProperty =
+            DependencyProperty.Register(nameof(PlayerMode), typeof(PlayerMode),
+                typeof(SmotrelPlayer),
+                new PropertyMetadata(PlayerMode.Normal, OnPlayerModeChanged));
 
-        public VideoWindowState VideoWindowState
+        public PlayerMode PlayerMode
         {
-            get => (VideoWindowState)GetValue(VideoWindowStateProperty);
-            set => SetValue(VideoWindowStateProperty, value);
+            get => (PlayerMode)GetValue(PlayerModeProperty);
+            set => SetValue(PlayerModeProperty, value);
         }
 
-        private static void OnVideoWindowStateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private static void OnPlayerModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            var p        = (SmotrelPlayer)d;
-            var oldState = (VideoWindowState)e.OldValue;
-            var newState = (VideoWindowState)e.NewValue;
+            var p = (SmotrelPlayer)d;
+            var mode = (PlayerMode)e.NewValue;
 
-            switch (newState)
+            switch (mode)
             {
-                case VideoWindowState.Maximized: p.EnterFullscreen();  break;
-                case VideoWindowState.PiP:       p.EnterPiP();         break;
-                case VideoWindowState.Normal:    p.ExitToNormal();     break;
+                case PlayerMode.Normal:
+                    // Все кнопки видны, кнопки Fullscreen/PiP видны, ExitMode — нет
+                    p.BtnFullscreen.Visibility = Visibility.Visible;
+                    p.BtnPip.Visibility = Visibility.Visible;
+                    p.BtnExitMode.Visibility = Visibility.Collapsed;
+                    break;
+
+                case PlayerMode.Fullscreen:
+                    // Только кнопка выхода из fullscreen (E73F = "свернуть окно")
+                    p.BtnFullscreen.Visibility = Visibility.Collapsed;
+                    p.BtnPip.Visibility = Visibility.Collapsed;
+                    p.BtnExitMode.Visibility = Visibility.Visible;
+                    p.GlyphExitMode.Text = "\uE73F"; // collapse / exit fullscreen
+                    p.BtnExitMode.ToolTip = "Выйти из полноэкранного режима";
+                    break;
+
+                case PlayerMode.PiP:
+                    // Только кнопка возврата в основное окно (E9A6)
+                    p.BtnFullscreen.Visibility = Visibility.Collapsed;
+                    p.BtnPip.Visibility = Visibility.Collapsed;
+                    p.BtnExitMode.Visibility = Visibility.Visible;
+                    p.GlyphExitMode.Text = "\uE9A6"; // picture in picture exit
+                    p.BtnExitMode.ToolTip = "Вернуть в основное окно";
+                    break;
             }
-
-            // Кнопки: BtnNormal виден только когда НЕ Normal
-            p.BtnNormal.Visibility = newState == VideoWindowState.Normal
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-
-            p.RaiseEvent(new VideoWindowStateChangedEventArgs(
-                VideoWindowStateChangedEvent, oldState, newState));
         }
 
         // ── IsLocked ─────────────────────────────────────────────────────────
 
         public static readonly DependencyProperty IsLockedProperty =
-            DependencyProperty.Register(
-                nameof(IsLocked), typeof(bool), typeof(SmotrelPlayer),
-                new PropertyMetadata(false, OnIsLockedChanged));
+            DependencyProperty.Register(nameof(IsLocked), typeof(bool),
+                typeof(SmotrelPlayer), new PropertyMetadata(false, OnIsLockedChanged));
 
         public bool IsLocked
         {
@@ -299,38 +268,31 @@ namespace Smotrel.Controls
 
         private static void OnIsLockedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            var p      = (SmotrelPlayer)d;
+            var p = (SmotrelPlayer)d;
             bool locked = (bool)e.NewValue;
-
             if (locked)
             {
-                // Запоминаем состояние, останавливаем воспроизведение
                 p._stateBeforeLock = p.PlayerState;
                 p.Media.Pause();
                 p._positionTimer.Stop();
                 p.GlyphPlayPause.Text = "\uE768";
-
-                p.LockOverlay.Visibility    = Visibility.Visible;
+                p.LockOverlay.Visibility = Visibility.Visible;
                 p.ControlsOverlay.Visibility = Visibility.Collapsed;
             }
             else
             {
-                p.LockOverlay.Visibility     = Visibility.Collapsed;
+                p.LockOverlay.Visibility = Visibility.Collapsed;
                 p.ControlsOverlay.Visibility = Visibility.Visible;
-
-                // Восстанавливаем состояние до блокировки
                 if (p._stateBeforeLock == PlayerState.Playing)
-                {
                     p.PlayerState = PlayerState.Playing;
-                }
             }
         }
 
         // ── LockMessage ──────────────────────────────────────────────────────
 
         public static readonly DependencyProperty LockMessageProperty =
-            DependencyProperty.Register(
-                nameof(LockMessage), typeof(string), typeof(SmotrelPlayer),
+            DependencyProperty.Register(nameof(LockMessage), typeof(string),
+                typeof(SmotrelPlayer),
                 new PropertyMetadata("Контент недоступен", OnLockMessageChanged));
 
         public string LockMessage
@@ -345,8 +307,8 @@ namespace Smotrel.Controls
         // ── OverlayTimeout ───────────────────────────────────────────────────
 
         public static readonly DependencyProperty OverlayTimeoutProperty =
-            DependencyProperty.Register(
-                nameof(OverlayTimeout), typeof(TimeSpan), typeof(SmotrelPlayer),
+            DependencyProperty.Register(nameof(OverlayTimeout), typeof(TimeSpan),
+                typeof(SmotrelPlayer),
                 new PropertyMetadata(TimeSpan.FromSeconds(3), OnOverlayTimeoutChanged));
 
         public TimeSpan OverlayTimeout
@@ -358,14 +320,14 @@ namespace Smotrel.Controls
         private static void OnOverlayTimeoutChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
             => ((SmotrelPlayer)d)._overlayTimer.Interval = (TimeSpan)e.NewValue;
 
-        // ── TimelineColor (кастомный цвет прогрессбара) ──────────────────────
+        // ── TimelineColor ────────────────────────────────────────────────────
 
         public static readonly DependencyProperty TimelineColorProperty =
-            DependencyProperty.Register(
-                nameof(TimelineColor), typeof(Brush), typeof(SmotrelPlayer),
+            DependencyProperty.Register(nameof(TimelineColor), typeof(Brush),
+                typeof(SmotrelPlayer),
                 new PropertyMetadata(
                     new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x33)),
-                    OnTimelineColorChanged));
+                    (d, e) => ((SmotrelPlayer)d).Timeline.ProgressBrush = (Brush)e.NewValue));
 
         public Brush TimelineColor
         {
@@ -373,76 +335,65 @@ namespace Smotrel.Controls
             set => SetValue(TimelineColorProperty, value);
         }
 
-        private static void OnTimelineColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-            => ((SmotrelPlayer)d).Timeline.ProgressBrush = (Brush)e.NewValue;
-
         // ════════════════════════════════════════════════════════════════════════
-        //  ROUTED EVENTS  (RoutingStrategy.Bubble)
+        //  ROUTED EVENTS
         // ════════════════════════════════════════════════════════════════════════
 
         public static readonly RoutedEvent PlaybackStateChangedEvent =
-            EventManager.RegisterRoutedEvent(
-                nameof(PlaybackStateChanged), RoutingStrategy.Bubble,
-                typeof(EventHandler<PlayerStateChangedEventArgs>), typeof(SmotrelPlayer));
-
-        public event EventHandler<PlayerStateChangedEventArgs> PlaybackStateChanged
+            EventManager.RegisterRoutedEvent(nameof(PlaybackStateChanged),
+                RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SmotrelPlayer));
+        public event RoutedEventHandler PlaybackStateChanged
         {
-            add    => AddHandler(PlaybackStateChangedEvent, value);
+            add => AddHandler(PlaybackStateChangedEvent, value);
             remove => RemoveHandler(PlaybackStateChangedEvent, value);
         }
 
         public static readonly RoutedEvent PlaybackEndedEvent =
-            EventManager.RegisterRoutedEvent(
-                nameof(PlaybackEnded), RoutingStrategy.Bubble,
-                typeof(RoutedEventHandler), typeof(SmotrelPlayer));
-
+            EventManager.RegisterRoutedEvent(nameof(PlaybackEnded),
+                RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SmotrelPlayer));
         public event RoutedEventHandler PlaybackEnded
         {
-            add    => AddHandler(PlaybackEndedEvent, value);
+            add => AddHandler(PlaybackEndedEvent, value);
             remove => RemoveHandler(PlaybackEndedEvent, value);
         }
 
         public static readonly RoutedEvent PreviousRequestedEvent =
-            EventManager.RegisterRoutedEvent(
-                nameof(PreviousRequested), RoutingStrategy.Bubble,
-                typeof(RoutedEventHandler), typeof(SmotrelPlayer));
-
+            EventManager.RegisterRoutedEvent(nameof(PreviousRequested),
+                RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SmotrelPlayer));
         public event RoutedEventHandler PreviousRequested
         {
-            add    => AddHandler(PreviousRequestedEvent, value);
+            add => AddHandler(PreviousRequestedEvent, value);
             remove => RemoveHandler(PreviousRequestedEvent, value);
         }
 
         public static readonly RoutedEvent NextRequestedEvent =
-            EventManager.RegisterRoutedEvent(
-                nameof(NextRequested), RoutingStrategy.Bubble,
-                typeof(RoutedEventHandler), typeof(SmotrelPlayer));
-
+            EventManager.RegisterRoutedEvent(nameof(NextRequested),
+                RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SmotrelPlayer));
         public event RoutedEventHandler NextRequested
         {
-            add    => AddHandler(NextRequestedEvent, value);
+            add => AddHandler(NextRequestedEvent, value);
             remove => RemoveHandler(NextRequestedEvent, value);
         }
 
         public static readonly RoutedEvent VolumeChangedEvent =
-            EventManager.RegisterRoutedEvent(
-                nameof(VolumeChangedRouted), RoutingStrategy.Bubble,
-                typeof(EventHandler<VolumeChangedEventArgs>), typeof(SmotrelPlayer));
-
-        public event EventHandler<VolumeChangedEventArgs> VolumeChangedRouted
+            EventManager.RegisterRoutedEvent(nameof(VolumeChangedRouted),
+                RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SmotrelPlayer));
+        public event RoutedEventHandler VolumeChangedRouted
         {
-            add    => AddHandler(VolumeChangedEvent, value);
+            add => AddHandler(VolumeChangedEvent, value);
             remove => RemoveHandler(VolumeChangedEvent, value);
         }
 
+        /// <summary>
+        /// Пользователь запросил смену режима окна.
+        /// MainPlayer обрабатывает этот ивент, сам SmotrelPlayer ничего не перемещает.
+        /// </summary>
         public static readonly RoutedEvent VideoWindowStateChangedEvent =
-            EventManager.RegisterRoutedEvent(
-                nameof(VideoWindowStateChanged), RoutingStrategy.Bubble,
-                typeof(EventHandler<VideoWindowStateChangedEventArgs>), typeof(SmotrelPlayer));
-
-        public event EventHandler<VideoWindowStateChangedEventArgs> VideoWindowStateChanged
+            EventManager.RegisterRoutedEvent(nameof(VideoWindowStateChanged),
+                RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SmotrelPlayer));
+        public event RoutedEventHandler VideoWindowStateChanged
         {
-            add    => AddHandler(VideoWindowStateChangedEvent, value);
+            add => AddHandler(VideoWindowStateChangedEvent, value);
             remove => RemoveHandler(VideoWindowStateChangedEvent, value);
         }
 
@@ -450,22 +401,21 @@ namespace Smotrel.Controls
         //  ПУБЛИЧНЫЙ API
         // ════════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Загружает видео и таймкоды. Сбрасывает позицию и запускает воспроизведение.
-        /// Основная точка входа — вручную задавать DP не нужно.
-        /// </summary>
         public void LoadVideo(IVideo video, IEnumerable<ITimecode>? timecodes = null)
         {
             _timecodes = timecodes?.ToList() ?? new List<ITimecode>();
-
-            Title    = video.Title;
-            FilePath = video.FilePath; // → OnFilePathChanged → Media.Source = new Uri(...)
-
             Timeline.Timecodes = _timecodes;
+            Title = video.Title;
+            FilePath = video.FilePath;
+            SetValue(CurrentTimeProperty, TimeSpan.Zero);
+        }
 
-            // Сброс позиции и состояния
-            CurrentTime = TimeSpan.Zero;
-            // Воспроизведение запустится в Media_MediaOpened
+        /// <summary>Программный переход на позицию (без поднятия события).</summary>
+        public void SeekTo(TimeSpan position)
+        {
+            if (Media.NaturalDuration.HasTimeSpan)
+                Media.Position = position;
+            SetValue(CurrentTimeProperty, position);
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -476,32 +426,27 @@ namespace Smotrel.Controls
         {
             if (!Media.NaturalDuration.HasTimeSpan) return;
 
-            var duration = Media.NaturalDuration.TimeSpan;
-
-            Timeline.Duration = duration;
+            Timeline.Duration = Media.NaturalDuration.TimeSpan;
             UpdateTimeLabel(TimeSpan.Zero);
 
-            // Применяем громкость и скорость
-            Media.Volume      = IsMuted ? 0 : Volume;
-            Media.SpeedRatio  = _playbackSpeed;
+            Media.Volume = IsMuted ? 0 : Volume;
+            Media.SpeedRatio = _playbackSpeed;
 
-            // Запускаем воспроизведение
+            // Дефолт PlayerState = Playing → callback запустит Media.Play()
             PlayerState = PlayerState.Playing;
         }
 
         private void Media_MediaEnded(object sender, RoutedEventArgs e)
         {
-            PlayerState = PlayerState.Paused;
-            CurrentTime = TimeSpan.Zero;
-            Timeline.Value = 0;
-
+            _positionTimer.Stop();
+            // Не меняем PlayerState — пусть MainPlayer решает что делать
+            Timeline.Value = 1.0;
             RaiseEvent(new RoutedEventArgs(PlaybackEndedEvent));
         }
 
         private void Media_MediaFailed(object? sender, ExceptionRoutedEventArgs e)
         {
-            // TODO: показать сообщение об ошибке
-            PlayerState = PlayerState.Paused;
+            _positionTimer.Stop();
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -511,9 +456,12 @@ namespace Smotrel.Controls
         private void OverlayTimer_Tick(object? sender, EventArgs e)
         {
             _overlayTimer.Stop();
-            // Скрываем оверлей только если идёт воспроизведение
             if (PlayerState == PlayerState.Playing)
+            {
                 HideOverlay();
+                // Скрываем курсор вместе с оверлеем
+                RootGrid.Cursor = Cursors.None;
+            }
         }
 
         private void PositionTimer_Tick(object? sender, EventArgs e)
@@ -521,12 +469,19 @@ namespace Smotrel.Controls
             if (_isScrubbing || !Media.NaturalDuration.HasTimeSpan) return;
 
             var pos = Media.Position;
-
-            // Обновляем без PropertyChangedCallback (чтобы не перемещать Media.Position)
             SetValue(CurrentTimeProperty, pos);
             UpdateTimeLabel(pos);
             UpdateChapterLabel(pos);
             UpdateTimelineValue(pos);
+        }
+
+        private void ScrubEndTimer_Tick(object? sender, EventArgs e)
+        {
+            _scrubEndTimer.Stop();
+            _isScrubbing = false;
+
+            // Восстанавливаем громкость после скраббинга
+            Media.Volume = IsMuted ? 0 : _volumeBeforeScrub;
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -535,8 +490,10 @@ namespace Smotrel.Controls
 
         private void ShowOverlay()
         {
-            ControlsOverlay.IsHitTestVisible = true;
+            // Возвращаем курсор
+            RootGrid.Cursor = null; // наследует от родителя (обычно Arrow)
 
+            ControlsOverlay.IsHitTestVisible = true;
             var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(150));
             ControlsOverlay.BeginAnimation(OpacityProperty, anim);
 
@@ -547,10 +504,7 @@ namespace Smotrel.Controls
         private void HideOverlay()
         {
             var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(300));
-            anim.Completed += (_, _) =>
-            {
-                ControlsOverlay.IsHitTestVisible = false;
-            };
+            anim.Completed += (_, _) => ControlsOverlay.IsHitTestVisible = false;
             ControlsOverlay.BeginAnimation(OpacityProperty, anim);
         }
 
@@ -559,70 +513,147 @@ namespace Smotrel.Controls
             ShowOverlay();
         }
 
-        // ── Двойной клик: переключение Play/Pause ─────────────────────────────
+        // ── Одиночный клик = Play/Pause ───────────────────────────────────────
 
         protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
         {
             base.OnMouseLeftButtonDown(e);
 
-            if (e.ClickCount == 2)
+            // Кликнули на кнопку управления — не реагируем
+            if (e.OriginalSource is TextBlock tb && tb.Parent is Button) return;
+            if (e.OriginalSource is Button) return;
+
+            if (e.ClickCount == 1)
             {
                 TogglePlayPause();
-                e.Handled = true;
+                // e.Handled остаётся false — PipPlayer может вызвать DragMove
             }
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        //  АНИМАЦИЯ СМЕНЫ СОСТОЯНИЯ (центральный глиф)
+        //  ГОРЯЧИЕ КЛАВИШИ (вызывается из MainPlayer/PipPlayer)
+        // ════════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Обрабатывает горячую клавишу. Вызывать только когда игрок в фокусе.
+        /// </summary>
+        public bool HandleHotkey(Key key, ModifierKeys modifiers)
+        {
+            if (IsLocked) return false;
+
+            var s = AppSettings.Current;
+
+            // Shift+Left = предыдущее видео
+            if (key == Key.Left && modifiers == ModifierKeys.Shift)
+            {
+                RaiseEvent(new RoutedEventArgs(PreviousRequestedEvent));
+                return true;
+            }
+            // Shift+Right = следующее видео
+            if (key == Key.Right && modifiers == ModifierKeys.Shift)
+            {
+                RaiseEvent(new RoutedEventArgs(NextRequestedEvent));
+                return true;
+            }
+
+            if (modifiers != ModifierKeys.None) return false;
+
+            switch (key)
+            {
+                case Key.Space:
+                    TogglePlayPause();
+                    return true;
+
+                case Key.Right:
+                    Seek(TimeSpan.FromSeconds(s.SeekForwardSeconds));
+                    return true;
+
+                case Key.Left:
+                    Seek(TimeSpan.FromSeconds(-s.SeekBackwardSeconds));
+                    return true;
+
+                case Key.F:
+                    if (PlayerMode == PlayerMode.Normal)
+                        RequestWindowState(VideoWindowStateRequest.Fullscreen);
+                    else if (PlayerMode == PlayerMode.Fullscreen)
+                        RequestWindowState(VideoWindowStateRequest.Normal);
+                    return true;
+
+                case Key.P:
+                    if (PlayerMode == PlayerMode.Normal)
+                        RequestWindowState(VideoWindowStateRequest.PiP);
+                    else if (PlayerMode == PlayerMode.PiP)
+                        RequestWindowState(VideoWindowStateRequest.Normal);
+                    return true;
+
+                case Key.Escape:
+                    if (PlayerMode != PlayerMode.Normal)
+                        RequestWindowState(VideoWindowStateRequest.Normal);
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void Seek(TimeSpan delta)
+        {
+            if (!Media.NaturalDuration.HasTimeSpan) return;
+
+            var total = Media.NaturalDuration.TimeSpan;
+            var pos = Media.Position + delta;
+            pos = pos < TimeSpan.Zero ? TimeSpan.Zero
+                : pos > total ? total
+                : pos;
+
+            Media.Position = pos;
+            SetValue(CurrentTimeProperty, pos);
+            UpdateTimeLabel(pos);
+            UpdateTimelineValue(pos);
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        //  АНИМАЦИЯ PLAY / PAUSE
         // ════════════════════════════════════════════════════════════════════════
 
         private void RunPlayStateAnimation(PlayerState newState)
         {
-            // Глиф: Play→показываем ▶, Pause→показываем ⏸
             PlayStateGlyph.Text = newState == PlayerState.Playing ? "\uE769" : "\uE768";
 
             var sb = new Storyboard();
 
-            // Показать Host
-            var showVis = new ObjectAnimationUsingKeyFrames();
-            Storyboard.SetTarget(showVis, PlayStateGlyphHost);
-            Storyboard.SetTargetProperty(showVis, new PropertyPath(VisibilityProperty));
-            showVis.KeyFrames.Add(new DiscreteObjectKeyFrame(Visibility.Visible, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            sb.Children.Add(showVis);
+            void AddVis(bool show, double atMs)
+            {
+                var v = new ObjectAnimationUsingKeyFrames();
+                Storyboard.SetTarget(v, PlayStateGlyphHost);
+                Storyboard.SetTargetProperty(v, new PropertyPath(VisibilityProperty));
+                v.KeyFrames.Add(new DiscreteObjectKeyFrame(
+                    show ? Visibility.Visible : Visibility.Collapsed,
+                    KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(atMs))));
+                sb.Children.Add(v);
+            }
 
-            // Opacity: 0 → 1 за 80ms
-            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(80));
-            Storyboard.SetTarget(fadeIn, PlayStateGlyphHost);
-            Storyboard.SetTargetProperty(fadeIn, new PropertyPath(OpacityProperty));
-            sb.Children.Add(fadeIn);
+            void AddDouble(DependencyObject target, PropertyPath prop,
+                double from, double to, double beginMs, double durationMs,
+                IEasingFunction? ease = null)
+            {
+                var a = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(durationMs))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(beginMs),
+                    EasingFunction = ease,
+                };
+                Storyboard.SetTarget(a, target);
+                Storyboard.SetTargetProperty(a, prop);
+                sb.Children.Add(a);
+            }
 
-            // Scale Host: 0.6 → 1.0 за 180ms
-            var scaleX = new DoubleAnimation(0.6, 1.0, TimeSpan.FromMilliseconds(180))
-                { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
-            Storyboard.SetTarget(scaleX, PlayStateScale);
-            Storyboard.SetTargetProperty(scaleX, new PropertyPath(ScaleTransform.ScaleXProperty));
-            sb.Children.Add(scaleX);
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
-            var scaleY = scaleX.Clone();
-            Storyboard.SetTarget(scaleY, PlayStateScale);
-            Storyboard.SetTargetProperty(scaleY, new PropertyPath(ScaleTransform.ScaleYProperty));
-            sb.Children.Add(scaleY);
-
-            // Удержание 450ms, затем Opacity: 1 → 0 за 250ms
-            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(250))
-                { BeginTime = TimeSpan.FromMilliseconds(450) };
-            Storyboard.SetTarget(fadeOut, PlayStateGlyphHost);
-            Storyboard.SetTargetProperty(fadeOut, new PropertyPath(OpacityProperty));
-            sb.Children.Add(fadeOut);
-
-            // Скрыть Host после анимации
-            var hideVis = new ObjectAnimationUsingKeyFrames();
-            Storyboard.SetTarget(hideVis, PlayStateGlyphHost);
-            Storyboard.SetTargetProperty(hideVis, new PropertyPath(VisibilityProperty));
-            hideVis.KeyFrames.Add(new DiscreteObjectKeyFrame(
-                Visibility.Collapsed,
-                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(700))));
-            sb.Children.Add(hideVis);
+            AddVis(true, 0);
+            AddDouble(PlayStateGlyphHost, new PropertyPath(OpacityProperty), 0, 1, 0, 80);
+            AddDouble(PlayStateScale, new PropertyPath(ScaleTransform.ScaleXProperty), 0.6, 1.0, 0, 180, ease);
+            AddDouble(PlayStateScale, new PropertyPath(ScaleTransform.ScaleYProperty), 0.6, 1.0, 0, 180, ease);
+            AddDouble(PlayStateGlyphHost, new PropertyPath(OpacityProperty), 1, 0, 480, 220);
+            AddVis(false, 710);
 
             sb.Begin();
         }
@@ -634,10 +665,8 @@ namespace Smotrel.Controls
         private void UpdateTimeLabel(TimeSpan current)
         {
             var total = Media.NaturalDuration.HasTimeSpan
-                ? Media.NaturalDuration.TimeSpan
-                : TimeSpan.Zero;
-
-            TbTime.Text = $"{FormatTime(current)} / {FormatTime(total)}";
+                ? Media.NaturalDuration.TimeSpan : TimeSpan.Zero;
+            TbTime.Text = $"{Fmt(current)} / {Fmt(total)}";
         }
 
         private void UpdateChapterLabel(TimeSpan current)
@@ -648,46 +677,31 @@ namespace Smotrel.Controls
                 if (tc.Position <= current) active = tc;
                 else break;
             }
-
-            if (active != null)
-            {
-                TbChapter.Text    = active.Label;
-                TbChapter.Opacity = 1.0;
-            }
-            else
-            {
-                TbChapter.Opacity = 0.0;
-            }
+            if (active != null) { TbChapter.Text = active.Label; TbChapter.Opacity = 1; }
+            else TbChapter.Opacity = 0;
         }
 
         private void UpdateTimelineValue(TimeSpan current)
         {
             if (_isScrubbing || !Media.NaturalDuration.HasTimeSpan) return;
-
             var total = Media.NaturalDuration.TimeSpan;
-            if (total.TotalSeconds <= 0) return;
-
-            Timeline.Value = current.TotalSeconds / total.TotalSeconds;
+            if (total.TotalSeconds > 0)
+                Timeline.Value = current.TotalSeconds / total.TotalSeconds;
         }
 
-        /// <summary>
-        /// Обновляет иконку громкости по порогам.
-        /// E992 = Mute; E993 = тихо; E994 = средне; E995 = громко.
-        /// </summary>
         private void UpdateVolumeGlyph()
         {
             double vol = IsMuted ? 0.0 : Volume;
-
             GlyphVolume.Text = vol switch
             {
-                0.0     => "\uE992",  // Mute 
-                <= 0.33 => "\uE993",  // Volume1
-                <= 0.66 => "\uE994",  // Volume2
-                _       => "\uE995",  // Volume3 (max)
+                0.0 => "\uE970",
+                <= 0.33 => "\uE993",
+                <= 0.66 => "\uE994",
+                _ => "\uE995",
             };
         }
 
-        private static string FormatTime(TimeSpan ts) =>
+        private static string Fmt(TimeSpan ts) =>
             ts.TotalHours >= 1
                 ? $"{(int)ts.TotalHours}:{ts.Minutes:D2}:{ts.Seconds:D2}"
                 : $"{ts.Minutes}:{ts.Seconds:D2}";
@@ -696,12 +710,11 @@ namespace Smotrel.Controls
         {
             if (IsLocked) return;
             PlayerState = PlayerState == PlayerState.Playing
-                ? PlayerState.Paused
-                : PlayerState.Playing;
+                ? PlayerState.Paused : PlayerState.Playing;
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        //  ОБРАБОТЧИКИ КНОПОК
+        //  КНОПКИ НИЖНЕЙ ПАНЕЛИ
         // ════════════════════════════════════════════════════════════════════════
 
         private void BtnPlayPause_Click(object sender, RoutedEventArgs e) => TogglePlayPause();
@@ -714,30 +727,32 @@ namespace Smotrel.Controls
 
         private void BtnMute_Click(object sender, RoutedEventArgs e)
         {
-            double oldVol = IsMuted ? 0 : Volume;
-
             IsMuted = !IsMuted;
-
-            double newVol = IsMuted ? 0 : Volume;
-            RaiseEvent(new VolumeChangedEventArgs(VolumeChangedEvent, oldVol, newVol));
+            RaiseEvent(new RoutedEventArgs(VolumeChangedEvent));
         }
 
         private void BtnFullscreen_Click(object sender, RoutedEventArgs e)
-            => VideoWindowState = VideoWindowState.Maximized;
+            => RequestWindowState(VideoWindowStateRequest.Fullscreen);
 
         private void BtnPip_Click(object sender, RoutedEventArgs e)
-            => VideoWindowState = VideoWindowState.PiP;
+            => RequestWindowState(VideoWindowStateRequest.PiP);
 
-        private void BtnNormal_Click(object sender, RoutedEventArgs e)
-            => VideoWindowState = VideoWindowState.Normal;
+        private void BtnExitMode_Click(object sender, RoutedEventArgs e)
+            => RequestWindowState(VideoWindowStateRequest.Normal);
+
+        private void RequestWindowState(VideoWindowStateRequest request)
+        {
+            var args = new VideoWindowStateRequestEventArgs(VideoWindowStateChangedEvent, request);
+            RaiseEvent(args);
+        }
 
         private void BtnSpeed_Click(object sender, RoutedEventArgs e)
         {
-            if (BtnSpeed.ContextMenu is { } menu)
+            if (BtnSpeed.ContextMenu is { } m)
             {
-                menu.PlacementTarget = BtnSpeed;
-                menu.Placement       = System.Windows.Controls.Primitives.PlacementMode.Top;
-                menu.IsOpen          = true;
+                m.PlacementTarget = BtnSpeed;
+                m.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+                m.IsOpen = true;
             }
         }
 
@@ -745,26 +760,30 @@ namespace Smotrel.Controls
         {
             if (sender is MenuItem item
                 && item.Tag is string tag
-                && double.TryParse(tag, NumberStyles.Any, CultureInfo.InvariantCulture, out double speed))
+                && double.TryParse(tag, NumberStyles.Any,
+                    CultureInfo.InvariantCulture, out double speed))
             {
-                _playbackSpeed   = speed;
-                TbSpeed.Text     = speed == 1.0 ? "1×" : $"{speed}×";
+                _playbackSpeed = speed;
+                TbSpeed.Text = speed == 1.0 ? "1×" : $"{speed}×";
                 Media.SpeedRatio = speed;
-
-                foreach (MenuItem mi in SpeedMenu.Items)
-                    mi.IsChecked = mi == item;
+                foreach (MenuItem mi in SpeedMenu.Items) mi.IsChecked = mi == item;
             }
         }
 
         // ── Таймлайн ─────────────────────────────────────────────────────────
 
-        private void Timeline_ValueChanged(
-            object sender,
+        private void Timeline_ValueChanged(object sender,
             RoutedPropertyChangedEventArgs<double> e)
         {
             if (!Media.NaturalDuration.HasTimeSpan) return;
 
-            _isScrubbing = true;
+            // Начало скраббинга: глушим звук чтобы не было треска
+            if (!_isScrubbing)
+            {
+                _volumeBeforeScrub = IsMuted ? 0 : Volume;
+                Media.Volume = 0;
+                _isScrubbing = true;
+            }
 
             var pos = TimeSpan.FromSeconds(
                 Media.NaturalDuration.TimeSpan.TotalSeconds * e.NewValue);
@@ -773,147 +792,40 @@ namespace Smotrel.Controls
             UpdateTimeLabel(pos);
             UpdateChapterLabel(pos);
 
-            // Сбрасываем scrubbing с небольшой задержкой
-            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-            t.Tick += (_, _) => { _isScrubbing = false; t.Stop(); };
-            t.Start();
+            // Перезапускаем таймер окончания скраббинга
+            _scrubEndTimer.Stop();
+            _scrubEndTimer.Start();
         }
 
         // ── Громкость ─────────────────────────────────────────────────────────
 
-        private void VolumeBar_ValueChanged(
-            object sender,
+        private void VolumeBar_ValueChanged(object sender,
             RoutedPropertyChangedEventArgs<double> e)
         {
-            double oldVol = Volume;
-
-            // Снимаем mute если потащили вверх
             if (IsMuted && e.NewValue > 0) IsMuted = false;
-
-            Volume         = e.NewValue;
-            Media.Volume   = IsMuted ? 0 : e.NewValue;
-
+            Volume = e.NewValue;
+            Media.Volume = IsMuted ? 0 : e.NewValue;
             UpdateVolumeGlyph();
-            RaiseEvent(new VolumeChangedEventArgs(VolumeChangedEvent, oldVol, e.NewValue));
+            RaiseEvent(new RoutedEventArgs(VolumeChangedEvent));
         }
 
-        // ── Lock overlay: поглощаем события ──────────────────────────────────
+        // ── Lock overlay ──────────────────────────────────────────────────────
 
         private void LockOverlay_PreviewMouseDown(object sender, MouseButtonEventArgs e)
             => e.Handled = true;
 
         private void LockOverlay_PreviewKeyDown(object sender, KeyEventArgs e)
             => e.Handled = true;
+    }
 
-        // ════════════════════════════════════════════════════════════════════════
-        //  REPARENTING — FULLSCREEN / PiP / NORMAL
-        // ════════════════════════════════════════════════════════════════════════
+    // ── Вспомогательные типы для события смены режима ─────────────────────────
 
-        /// <summary>
-        /// Сохраняет текущего родителя, извлекает SmotrelPlayer из него
-        /// и помещает в новый контейнер.
-        /// </summary>
-        private void DetachFromParent()
-        {
-            if (Parent is Panel panel)
-            {
-                _originalChildIndex = panel.Children.IndexOf(this);
-                _originalParent     = panel;
-                panel.Children.Remove(this);
-            }
-            else if (Parent is ContentControl cc)
-            {
-                _originalParent = null;
-                cc.Content      = null;
-            }
-            else if (Parent is Decorator dec)
-            {
-                _originalParent = null;
-                dec.Child       = null;
-            }
-        }
+    public enum VideoWindowStateRequest { Normal, Fullscreen, PiP }
 
-        /// <summary>
-        /// Возвращает SmotrelPlayer обратно в оригинальный родительский контейнер.
-        /// </summary>
-        private void ReattachToParent()
-        {
-            if (_originalParent != null)
-            {
-                _originalParent.Children.Insert(_originalChildIndex, this);
-                _originalParent = null;
-            }
-        }
-
-        private void EnterFullscreen()
-        {
-            DetachFromParent();
-
-            _fullscreenWindow = new Window
-            {
-                WindowStyle       = WindowStyle.None,
-                WindowState       = System.Windows.WindowState.Maximized,
-                ResizeMode        = ResizeMode.NoResize,
-                Background        = Brushes.Black,
-                Topmost           = true,
-                AllowsTransparency = false,
-                Content           = this,
-            };
-
-            // При закрытии окна — возвращаемся в Normal
-            _fullscreenWindow.PreviewKeyDown += (_, e) =>
-            {
-                if (e.Key == Key.Escape || e.Key == Key.F11)
-                    VideoWindowState = VideoWindowState.Normal;
-            };
-
-            _fullscreenWindow.Show();
-        }
-
-        private void EnterPiP()
-        {
-            DetachFromParent();
-
-            _pipWindow = new Window
-            {
-                Width             = 400,
-                Height            = 225,
-                WindowStyle       = WindowStyle.None,
-                ResizeMode        = ResizeMode.CanResize,
-                Background        = Brushes.Black,
-                Topmost           = true,
-                AllowsTransparency = false,
-                Title             = "SmotrelPlayer PiP",
-                Content           = this,
-            };
-
-            _pipWindow.PreviewKeyDown += (_, e) =>
-            {
-                if (e.Key == Key.Escape)
-                    VideoWindowState = VideoWindowState.Normal;
-            };
-
-            _pipWindow.Show();
-        }
-
-        private void ExitToNormal()
-        {
-            // Закрываем вспомогательные окна не вызывая повторного события
-            if (_fullscreenWindow != null)
-            {
-                _fullscreenWindow.Content = null;
-                _fullscreenWindow.Close();
-                _fullscreenWindow = null;
-            }
-
-            if (_pipWindow != null)
-            {
-                _pipWindow.Content = null;
-                _pipWindow.Close();
-                _pipWindow = null;
-            }
-
-            ReattachToParent();
-        }
+    public class VideoWindowStateRequestEventArgs : RoutedEventArgs
+    {
+        public VideoWindowStateRequest Request { get; }
+        public VideoWindowStateRequestEventArgs(RoutedEvent re, VideoWindowStateRequest req)
+            : base(re) { Request = req; }
     }
 }

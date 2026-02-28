@@ -7,7 +7,7 @@
 
     <UserControl.Resources>
 
-        <!-- ── Стиль иконок-кнопок плеера ─────────────────────────────────── -->
+        <!-- Кнопка-иконка плеера -->
         <Style x:Key="PlayerIconBtn" TargetType="Button">
             <Setter Property="Background"       Value="Transparent"/>
             <Setter Property="BorderThickness"  Value="0"/>
@@ -16,21 +16,17 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="4"
-                                Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="4" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background"
-                                        Value="#33FFFFFF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background"
-                                        Value="#55FFFFFF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#55FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -38,7 +34,7 @@
             </Setter>
         </Style>
 
-        <!-- ── Стиль пунктов меню скорости ───────────────────────────────── -->
+        <!-- Пункт меню скорости (тёмный) -->
         <Style x:Key="SpeedMenuItemStyle" TargetType="MenuItem">
             <Setter Property="Foreground"            Value="#CCCCCC"/>
             <Setter Property="Background"            Value="Transparent"/>
@@ -48,25 +44,18 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                Padding="12,7,20,7"
-                                MinWidth="110">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="12,7,20,7" MinWidth="110">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="18"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="Check"
-                                           Grid.Column="0"
-                                           Text="&#xE73E;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="10"
-                                           Foreground="#FF0033"
-                                           VerticalAlignment="Center"
-                                           Visibility="Collapsed"/>
-                                <ContentPresenter Grid.Column="1"
-                                                  ContentSource="Header"
+                                <TextBlock x:Name="Check" Grid.Column="0"
+                                           Text="&#xE73E;" FontFamily="Segoe MDL2 Assets"
+                                           FontSize="10" Foreground="#FF0033"
+                                           VerticalAlignment="Center" Visibility="Collapsed"/>
+                                <ContentPresenter Grid.Column="1" ContentSource="Header"
                                                   VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
@@ -87,58 +76,37 @@
 
     </UserControl.Resources>
 
-    <!--
-    ═══════════════════════════════════════════════════════════════════
-      ROOT GRID — все слои занимают одну ячейку (0,0)
-    ═══════════════════════════════════════════════════════════════════
-    -->
     <Grid x:Name="RootGrid" ClipToBounds="True">
 
         <!-- ── СЛОЙ 1: Видео ──────────────────────────────────────────────── -->
         <MediaElement x:Name="Media"
-                      LoadedBehavior="Manual"
-                      UnloadedBehavior="Stop"
-                      Stretch="Uniform"
-                      ScrubbingEnabled="True"
+                      LoadedBehavior="Manual" UnloadedBehavior="Stop"
+                      Stretch="Uniform" ScrubbingEnabled="True"
                       MediaOpened="Media_MediaOpened"
                       MediaEnded="Media_MediaEnded"
                       MediaFailed="Media_MediaFailed"/>
 
         <!-- ── СЛОЙ 2: Оверлей управления ────────────────────────────────── -->
-        <!--
-            Фон — LinearGradient: прозрачный в центре, тёмный сверху и снизу.
-            Скрытие — анимацией Opacity 1→0 через DispatcherTimer.
-        -->
         <Grid x:Name="ControlsOverlay" IsHitTestVisible="False">
-
             <Grid.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                     <GradientStop Color="#BB000000" Offset="0"/>
-                    <GradientStop Color="#00000000" Offset="0.25"/>
-                    <GradientStop Color="#00000000" Offset="0.72"/>
-                    <GradientStop Color="#CC000000" Offset="1"/>
+                    <GradientStop Color="#00000000" Offset="0.22"/>
+                    <GradientStop Color="#00000000" Offset="0.70"/>
+                    <GradientStop Color="#DD000000" Offset="1"/>
                 </LinearGradientBrush>
             </Grid.Background>
-
             <Grid.RowDefinitions>
-                <!-- Верхняя панель: title -->
                 <RowDefinition Height="Auto"/>
-                <!-- Центр: пустой, клики проходят насквозь -->
                 <RowDefinition Height="*"/>
-                <!-- Нижняя панель: таймлайн + кнопки -->
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- ── Верхняя панель (Title) ─────────────────────────────── -->
+            <!-- Заголовок -->
             <Border Grid.Row="0" Padding="16,10,16,8" IsHitTestVisible="True">
-                <TextBlock x:Name="TbTitle"
-                           Text="Название урока"
-                           Foreground="White"
-                           FontFamily="Arial"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center">
+                <TextBlock x:Name="TbTitle" Text="" Foreground="White"
+                           FontFamily="Arial" FontSize="14" FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
                     <TextBlock.Effect>
                         <DropShadowEffect Color="Black" BlurRadius="6"
                                           ShadowDepth="1" Opacity="0.8"/>
@@ -146,144 +114,105 @@
                 </TextBlock>
             </Border>
 
-            <!-- ── Нижняя панель ─────────────────────────────────────── -->
+            <!-- Нижняя панель -->
             <Grid Grid.Row="2" IsHitTestVisible="True">
                 <Grid.RowDefinitions>
-                    <!-- Строка 0: таймлайн -->
                     <RowDefinition Height="20"/>
-                    <!-- Строка 1: кнопки -->
                     <RowDefinition Height="44"/>
                 </Grid.RowDefinitions>
 
                 <!-- Таймлайн -->
                 <Grid Grid.Row="0" VerticalAlignment="Center" Margin="14,0,14,0">
-                    <self:ClickableProgressBar
-                        x:Name="Timeline"
+                    <self:ClickableProgressBar x:Name="Timeline"
                         ProgressBrush="#FF0033"
-                        BufferBrush="#66FFFFFF"
-                        TrackBrush="#44FFFFFF"
+                        BufferBrush="#55FFFFFF"
+                        TrackBrush="#33FFFFFF"
                         ValueChanged="Timeline_ValueChanged"/>
                 </Grid>
 
                 <!-- Строка управления -->
                 <Grid Grid.Row="1" Margin="6,0,6,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>  <!-- кнопки навигации/воспроизведения -->
-                        <ColumnDefinition Width="Auto"/>  <!-- громкость -->
-                        <ColumnDefinition Width="Auto"/>  <!-- время + глава -->
-                        <ColumnDefinition Width="*"/>     <!-- пространство -->
-                        <ColumnDefinition Width="Auto"/>  <!-- правые кнопки -->
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Пред / Play-Pause / След -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="BtnPrev"
-                                Width="36" Height="36" Padding="6"
+                        <Button x:Name="BtnPrev" Width="36" Height="36" Padding="6"
                                 ToolTip="Предыдущий урок"
-                                Style="{StaticResource PlayerIconBtn}"
-                                Click="BtnPrev_Click">
+                                Style="{StaticResource PlayerIconBtn}" Click="BtnPrev_Click">
                             <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets"
                                        FontSize="16" Foreground="White"/>
                         </Button>
-
-                        <Button x:Name="BtnPlayPause"
-                                Width="42" Height="42" Padding="6"
+                        <Button x:Name="BtnPlayPause" Width="42" Height="42" Padding="6"
                                 ToolTip="Воспроизведение / Пауза"
-                                Style="{StaticResource PlayerIconBtn}"
-                                Click="BtnPlayPause_Click">
-                            <TextBlock x:Name="GlyphPlayPause"
-                                       Text="&#xE768;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="20" Foreground="White"/>
+                                Style="{StaticResource PlayerIconBtn}" Click="BtnPlayPause_Click">
+                            <TextBlock x:Name="GlyphPlayPause" Text="&#xE768;"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="White"/>
                         </Button>
-
-                        <Button x:Name="BtnNext"
-                                Width="36" Height="36" Padding="6"
+                        <Button x:Name="BtnNext" Width="36" Height="36" Padding="6"
                                 ToolTip="Следующий урок"
-                                Style="{StaticResource PlayerIconBtn}"
-                                Click="BtnNext_Click">
+                                Style="{StaticResource PlayerIconBtn}" Click="BtnNext_Click">
                             <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets"
                                        FontSize="16" Foreground="White"/>
                         </Button>
                     </StackPanel>
 
-                    <!-- Иконка громкости + бар -->
+                    <!-- Громкость -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal"
                                 VerticalAlignment="Center" Margin="2,0,0,0">
-                        <Button x:Name="BtnMute"
-                                Width="32" Height="36" Padding="4"
-                                ToolTip="Отключить/включить звук"
-                                Style="{StaticResource PlayerIconBtn}"
+                        <Button x:Name="BtnMute" Width="32" Height="36" Padding="4"
+                                ToolTip="Mute" Style="{StaticResource PlayerIconBtn}"
                                 Click="BtnMute_Click">
-                            <TextBlock x:Name="GlyphVolume"
-                                       Text="&#xE995;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16" Foreground="White"/>
+                            <TextBlock x:Name="GlyphVolume" Text="&#xE995;"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="White"/>
                         </Button>
-
-                        <self:ClickableVolumeBar
-                            x:Name="VolumeBar"
-                            Width="72"
+                        <self:ClickableVolumeBar x:Name="VolumeBar" Width="72"
                             VerticalAlignment="Center"
-                            ProgressBrush="White"
-                            TrackBrush="#44FFFFFF"
+                            ProgressBrush="White" TrackBrush="#44FFFFFF"
                             ValueChanged="VolumeBar_ValueChanged"/>
                     </StackPanel>
 
-                    <!-- Метка времени + активная глава -->
+                    <!-- Время + глава -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal"
                                 VerticalAlignment="Center" Margin="10,0,0,0">
-                        <TextBlock x:Name="TbTime"
-                                   Text="0:00 / 0:00"
-                                   Foreground="White"
-                                   FontSize="12" FontFamily="Arial"
+                        <TextBlock x:Name="TbTime" Text="0:00 / 0:00"
+                                   Foreground="White" FontSize="12" FontFamily="Arial"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text=" · "
-                                   Foreground="#88FFFFFF"
+                        <TextBlock Text=" · " Foreground="#77FFFFFF"
                                    FontSize="12" VerticalAlignment="Center"/>
-                        <!--
-                            Метка активной главы.
-                            Opacity=0 когда глава не определена — размер не меняется.
-                        -->
-                        <TextBlock x:Name="TbChapter"
-                                   Text="Введение"
-                                   Opacity="0"
-                                   Foreground="#BBFFFFFF"
-                                   FontSize="12" FontFamily="Arial"
+                        <TextBlock x:Name="TbChapter" Text="" Opacity="0"
+                                   Foreground="#BBFFFFFF" FontSize="12" FontFamily="Arial"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Правые кнопки -->
-                    <StackPanel Grid.Column="4" Orientation="Horizontal"
-                                VerticalAlignment="Center">
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
 
                         <!-- Скорость -->
-                        <Button x:Name="BtnSpeed"
-                                Width="44" Height="36" Padding="4"
-                                ToolTip="Скорость воспроизведения"
-                                Style="{StaticResource PlayerIconBtn}"
+                        <Button x:Name="BtnSpeed" Width="44" Height="36" Padding="4"
+                                ToolTip="Скорость" Style="{StaticResource PlayerIconBtn}"
                                 Click="BtnSpeed_Click">
-                            <TextBlock x:Name="TbSpeed"
-                                       Text="1×"
-                                       Foreground="White"
-                                       FontSize="13" FontFamily="Arial"
-                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TbSpeed" Text="1×" Foreground="White"
+                                       FontSize="13" FontFamily="Arial" VerticalAlignment="Center"/>
                             <Button.ContextMenu>
                                 <ContextMenu x:Name="SpeedMenu" Placement="Top" HasDropShadow="True">
                                     <ContextMenu.Template>
                                         <ControlTemplate TargetType="ContextMenu">
-                                            <Border Background="#1E1E1E"
-                                                    BorderBrush="#3A3A3A"
-                                                    BorderThickness="1"
-                                                    CornerRadius="4"
-                                                    Padding="0,4,0,4"
-                                                    SnapsToDevicePixels="True">
+                                            <Border Background="#1E1E1E" BorderBrush="#3A3A3A"
+                                                    BorderThickness="1" CornerRadius="4"
+                                                    Padding="0,4,0,4" SnapsToDevicePixels="True">
                                                 <ItemsPresenter/>
                                             </Border>
                                         </ControlTemplate>
                                     </ContextMenu.Template>
                                     <ContextMenu.Resources>
-                                        <Style TargetType="MenuItem" BasedOn="{StaticResource SpeedMenuItemStyle}"/>
+                                        <Style TargetType="MenuItem"
+                                               BasedOn="{StaticResource SpeedMenuItemStyle}"/>
                                     </ContextMenu.Resources>
                                     <MenuItem Header="0.25×" Tag="0.25" Click="SpeedItem_Click"/>
                                     <MenuItem Header="0.5×"  Tag="0.5"  Click="SpeedItem_Click"/>
@@ -296,33 +225,32 @@
                             </Button.ContextMenu>
                         </Button>
 
-                        <!-- Нормальный режим (виден только в Fullscreen/PiP) -->
-                        <Button x:Name="BtnNormal"
-                                Width="36" Height="36" Padding="6"
+                        <!--
+                            BtnExitMode — универсальная кнопка "выйти из текущего режима".
+                            Видна только в Fullscreen/PiP. Иконка меняется из code-behind:
+                              Fullscreen → E73F
+                              PiP        → E9A6
+                        -->
+                        <Button x:Name="BtnExitMode" Width="36" Height="36" Padding="6"
                                 Visibility="Collapsed"
-                                ToolTip="Нормальный режим"
-                                Style="{StaticResource PlayerIconBtn}"
-                                Click="BtnNormal_Click">
-                            <TextBlock Text="&#xE923;" FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16" Foreground="#AAAAAA"/>
+                                Style="{StaticResource PlayerIconBtn}" Click="BtnExitMode_Click">
+                            <TextBlock x:Name="GlyphExitMode" Text="&#xE73F;"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                       Foreground="White"/>
                         </Button>
 
-                        <!-- Полный экран -->
-                        <Button x:Name="BtnFullscreen"
-                                Width="36" Height="36" Padding="6"
+                        <!-- Полный экран (виден только в Normal режиме) -->
+                        <Button x:Name="BtnFullscreen" Width="36" Height="36" Padding="6"
                                 ToolTip="Полный экран"
-                                Style="{StaticResource PlayerIconBtn}"
-                                Click="BtnFullscreen_Click">
+                                Style="{StaticResource PlayerIconBtn}" Click="BtnFullscreen_Click">
                             <TextBlock Text="&#xE740;" FontFamily="Segoe MDL2 Assets"
                                        FontSize="16" Foreground="White"/>
                         </Button>
 
-                        <!-- PiP -->
-                        <Button x:Name="BtnPip"
-                                Width="36" Height="36" Padding="6"
+                        <!-- PiP (виден только в Normal режиме) -->
+                        <Button x:Name="BtnPip" Width="36" Height="36" Padding="6"
                                 ToolTip="Картинка в картинке"
-                                Style="{StaticResource PlayerIconBtn}"
-                                Click="BtnPip_Click">
+                                Style="{StaticResource PlayerIconBtn}" Click="BtnPip_Click">
                             <TextBlock Text="&#xEF15;" FontFamily="Segoe MDL2 Assets"
                                        FontSize="16" Foreground="White"/>
                         </Button>
@@ -333,68 +261,50 @@
         </Grid>
 
         <!-- ── СЛОЙ 3: Оверлей блокировки ─────────────────────────────────── -->
-        <!--
-            Visibility управляется из code-behind через OnIsLockedChanged.
-            IsHitTestVisible=True — поглощает ВСЕ клики, плеер недоступен.
-        -->
-        <Grid x:Name="LockOverlay"
-              Visibility="Collapsed"
+        <Grid x:Name="LockOverlay" Visibility="Collapsed"
               IsHitTestVisible="True"
               PreviewMouseDown="LockOverlay_PreviewMouseDown"
               PreviewKeyDown="LockOverlay_PreviewKeyDown">
-
             <Grid.Background>
                 <SolidColorBrush Color="#CC000000"/>
             </Grid.Background>
-
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <!-- Иконка замка -->
-                <TextBlock Text="&#xE72E;"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="48"
-                           Foreground="#AAAAAA"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,12"/>
-                <!-- Текст блокировки -->
-                <TextBlock x:Name="TbLockMessage"
-                           Text="Контент недоступен"
-                           Foreground="White"
-                           FontSize="18" FontFamily="Arial"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Center"/>
+                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets"
+                           FontSize="48" Foreground="#AAAAAA"
+                           HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                <TextBlock x:Name="TbLockMessage" Text="Контент недоступен"
+                           Foreground="White" FontSize="22" FontFamily="Arial"
+                           FontWeight="SemiBold" HorizontalAlignment="Center"
+                           TextAlignment="Center" TextWrapping="Wrap"
+                           MaxWidth="400"/>
             </StackPanel>
         </Grid>
 
-        <!-- ── СЛОЙ 4: Анимация смены состояния (Play / Pause) ───────────── -->
+        <!-- ── СЛОЙ 4: Анимация Play/Pause (центральный глиф) ────────────── -->
         <!--
-            Показывается кратко при каждом переключении Play↔Pause.
-            IsHitTestVisible=False — не перехватывает клики.
-            Управляется из PlayStateAnimation_Run().
+            Увеличен до 110px круг / 48px иконка.
+            IsHitTestVisible=False — клики проходят насквозь.
         -->
         <Grid x:Name="PlayStateGlyphHost"
-              IsHitTestVisible="False"
-              Visibility="Collapsed"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center">
+              IsHitTestVisible="False" Visibility="Collapsed"
+              HorizontalAlignment="Center" VerticalAlignment="Center">
 
             <Ellipse x:Name="PlayStateCircle"
-                     Width="72" Height="72"
-                     Fill="#66000000"
+                     Width="110" Height="110"
+                     Fill="#77000000"
                      RenderTransformOrigin="0.5,0.5">
                 <Ellipse.RenderTransform>
-                    <ScaleTransform x:Name="PlayStateScale" ScaleX="0.7" ScaleY="0.7"/>
+                    <ScaleTransform x:Name="PlayStateScale" ScaleX="0.6" ScaleY="0.6"/>
                 </Ellipse.RenderTransform>
             </Ellipse>
 
             <TextBlock x:Name="PlayStateGlyph"
-                       FontFamily="Segoe MDL2 Assets"
-                       FontSize="32"
+                       FontFamily="Segoe MDL2 Assets" FontSize="48"
                        Foreground="White"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
                        RenderTransformOrigin="0.5,0.5">
                 <TextBlock.RenderTransform>
-                    <ScaleTransform x:Name="PlayStateGlyphScale" ScaleX="0.7" ScaleY="0.7"/>
+                    <ScaleTransform x:Name="PlayStateGlyphScale" ScaleX="0.6" ScaleY="0.6"/>
                 </TextBlock.RenderTransform>
             </TextBlock>
 

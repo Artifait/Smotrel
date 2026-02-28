@@ -1,0 +1,31 @@
+<Window x:Class="Smotrel.Views.PipPlayerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrls="clr-namespace:Smotrel.Controls"
+        Title="PiP"
+        Width="840" Height="480"
+        MinWidth="240" MinHeight="135"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        Closing="PipWindow_Closing">
+
+    <!--
+        AllowsTransparency=True + CornerRadius на Border дают скруглённые углы.
+        DragMove на MouseLeftButtonDown позволяет тащить окно.
+    -->
+    <Border Background="Black"
+            BorderBrush="#44FFFFFF"
+            BorderThickness="1"
+            CornerRadius="8"
+            ClipToBounds="True"
+            MouseLeftButtonDown="Border_MouseLeftButtonDown">
+
+        <ctrls:SmotrelPlayer x:Name="Player"
+                             PlayerMode="PiP"/>
+
+    </Border>
+</Window>

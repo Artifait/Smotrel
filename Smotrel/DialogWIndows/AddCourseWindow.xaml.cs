@@ -1,11 +1,12 @@
-﻿using System.ComponentModel;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Windows;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using Smotrel.Models;
 using Smotrel.Services;
 using Smotrel.Views;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Windows;
 
 namespace Smotrel.DialogWindows
 {
@@ -20,165 +21,209 @@ namespace Smotrel.DialogWindows
         public int TotalVideos { get; set; }
         public int TotalChapters { get; set; }
         public int MaxDepth { get; set; }
-        public List<ChapterSummary> ChapterSummaries { get; set; } = new List<ChapterSummary>();
+        public List<ChapterSummary> ChapterSummaries { get; set; } = [];
     }
 
     public partial class AddCourseWindow : Window, INotifyPropertyChanged
     {
-        public CourseModel? OutCourseModel { get; set; } = null;
+        // ── Выходная модель ───────────────────────────────────────────────────
+
+        public CourseModel? OutCourseModel { get; set; }
+
+        // ── Отмена сканирования ───────────────────────────────────────────────
+
+        private CancellationTokenSource? _cts;
+
+        // ── Bindable свойства ─────────────────────────────────────────────────
 
         private string _selectedFolderPath = string.Empty;
         public string SelectedFolderPath
         {
             get => _selectedFolderPath;
-            set
-            {
-                if (_selectedFolderPath == value) return;
-                _selectedFolderPath = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsAddEnabled));
-            }
+            set { _selectedFolderPath = value; Notify(); Notify(nameof(IsAddEnabled)); }
         }
 
-        public bool IsAddEnabled => !string.IsNullOrWhiteSpace(SelectedFolderPath) && Directory.Exists(SelectedFolderPath);
+        public bool IsAddEnabled =>
+            !string.IsNullOrWhiteSpace(SelectedFolderPath)
+            && Directory.Exists(SelectedFolderPath)
+            && !_isScanning
+            && OutCourseModel != null;
+
+        private bool _isScanning;
+        public bool IsScanning
+        {
+            get => _isScanning;
+            set { _isScanning = value; Notify(); Notify(nameof(IsAddEnabled)); Notify(nameof(IsNotScanning)); }
+        }
+
+        public bool IsNotScanning => !_isScanning;
 
         private bool _isStatsVisible;
         public bool IsStatsVisible
         {
             get => _isStatsVisible;
-            set
-            {
-                if (_isStatsVisible == value) return;
-                _isStatsVisible = value;
-                OnPropertyChanged();
-            }
+            set { _isStatsVisible = value; Notify(); }
         }
 
         private string _courseTitle = string.Empty;
         public string CourseTitle
         {
             get => _courseTitle;
-            set
-            {
-                if (_courseTitle == value) return;
-                _courseTitle = value;
-                OnPropertyChanged();
-            }
+            set { _courseTitle = value; Notify(); }
         }
 
-        private CourseStatsModel _courseStats = new CourseStatsModel();
+        private CourseStatsModel _courseStats = new();
         public CourseStatsModel CourseStats
         {
             get => _courseStats;
-            set
-            {
-                _courseStats = value;
-                OnPropertyChanged();
-            }
+            set { _courseStats = value; Notify(); }
         }
+
+        // ── Прогресс сканирования ─────────────────────────────────────────────
+
+        private int _scanProgress;
+        public int ScanProgress
+        {
+            get => _scanProgress;
+            set { _scanProgress = value; Notify(); }
+        }
+
+        private string _scanCurrentFile = string.Empty;
+        public string ScanCurrentFile
+        {
+            get => _scanCurrentFile;
+            set { _scanCurrentFile = value; Notify(); }
+        }
+
+        private string _scanProgressText = string.Empty;
+        public string ScanProgressText
+        {
+            get => _scanProgressText;
+            set { _scanProgressText = value; Notify(); }
+        }
+
+        // ── Конструктор ───────────────────────────────────────────────────────
 
         public AddCourseWindow()
         {
             InitializeComponent();
             DataContext = this;
-            IsStatsVisible = false;
-            CourseStats = new CourseStatsModel();
-            CourseTitle = string.Empty;
         }
 
-        private void BrowseButton_Click(object sender, RoutedEventArgs e)
+        // ── Выбор папки и сканирование ────────────────────────────────────────
+
+        private async void BrowseButton_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new OpenFolderDialog()
+            // Если сейчас идёт сканирование — отменяем
+            if (_isScanning)
+            {
+                _cts?.Cancel();
+                return;
+            }
+
+            var dlg = new OpenFolderDialog
             {
                 Multiselect = false,
                 Title = "Выберите папку с курсом"
             };
 
-            var res = dlg.ShowDialog();
-            if (res == true)
+            if (dlg.ShowDialog() != true) return;
+
+            // Проверяем дубликат
+            if (MainWindow.Context.CourseCardPathExistsAsync(dlg.FolderName).GetAwaiter().GetResult())
             {
-                if (MainWindow.Context.CourseCardPathExistsAsync(dlg.FolderName).GetAwaiter().GetResult())
-                {
-                    MessageBox.Show(this, "Этот курс уже добавлен.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    OutCourseModel = null;
-                    CourseTitle = string.Empty;
-                    CourseStats = new CourseStatsModel();
-                    IsStatsVisible = false;
-                    return;
-                }
-                SelectedFolderPath = dlg.FolderName;
-                try
-                {
-                    var builder = new CourseBuilder();
-                    var model = builder.BuildFromDirectory(SelectedFolderPath);
-                    if (model != null && model.MainChapter != null)
-                    {
-                        OutCourseModel = model;
-                        CourseTitle = string.IsNullOrWhiteSpace(model.Label) ? Path.GetFileName(SelectedFolderPath) ?? model.Label : model.Label;
-                        CourseStats = BuildStats(model);
-                        OnPropertyChanged(nameof(CourseStats));
-                        IsStatsVisible = true;
-                    }
-                    else
-                    {
-                        OutCourseModel = null;
-                        CourseTitle = string.Empty;
-                        CourseStats = new CourseStatsModel();
-                        IsStatsVisible = false;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    OutCourseModel = null;
-                    CourseTitle = string.Empty;
-                    CourseStats = new CourseStatsModel();
-                    IsStatsVisible = false;
-                    MessageBox.Show(this, "Не удалось собрать информацию о курсе: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-                OnPropertyChanged(nameof(IsAddEnabled));
+                MessageBox.Show(this, "Этот курс уже добавлен.", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
             }
 
-            if(IsAddEnabled)
+            SelectedFolderPath = dlg.FolderName;
+            OutCourseModel = null;
+            IsStatsVisible = false;
+            CourseTitle = string.Empty;
+            CourseStats = new();
+
+            await ScanCourseAsync(dlg.FolderName);
+
+            Notify(nameof(IsAddEnabled));
+        }
+
+        private async Task ScanCourseAsync(string path)
+        {
+            IsScanning = true;
+            ScanProgress = 0;
+            ScanCurrentFile = "Сканирование структуры...";
+            ScanProgressText = "0%";
+
+            _cts = new CancellationTokenSource();
+
+            var progress = new Progress<CourseBuilderProgress>(p =>
             {
-                AddButton.Content = "Добавить курс";
+                ScanProgress = p.Percent;
+                ScanProgressText = $"{p.Current} / {p.Total}  ({p.Percent}%)";
+                ScanCurrentFile = string.IsNullOrEmpty(p.FileName)
+                    ? "Завершение..."
+                    : p.FileName;
+            });
+
+            try
+            {
+                var builder = new CourseBuilderService();
+                var model = await builder.BuildAsync(path, progress, _cts.Token);
+
+                OutCourseModel = model;
+                CourseTitle = string.IsNullOrWhiteSpace(model.Label)
+                    ? Path.GetFileName(path)
+                    : model.Label;
+                CourseStats = BuildStats(model);
+                IsStatsVisible = true;
             }
-            else
+            catch (OperationCanceledException)
             {
-                AddButton.Content = "Путь не задан";
+                OutCourseModel = null;
+                IsStatsVisible = false;
+                ScanCurrentFile = "Отменено";
+            }
+            catch (Exception ex)
+            {
+                OutCourseModel = null;
+                IsStatsVisible = false;
+                MessageBox.Show(this, "Ошибка при сканировании: " + ex.Message,
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                IsScanning = false;
+                _cts = null;
             }
         }
 
-        private CourseStatsModel BuildStats(CourseModel model)
+        // ── Построение статистики ─────────────────────────────────────────────
+
+        private static CourseStatsModel BuildStats(CourseModel model)
         {
             var stats = new CourseStatsModel();
             if (model?.MainChapter == null) return stats;
 
-            int totalVideos = 0;
-            int totalChaps = 0;
-            int maxDepth = 0;
-            var chapterSummaries = new List<ChapterSummary>();
+            int totalVideos = 0, totalChaps = 0, maxDepth = 0;
+            var summaries = new List<ChapterSummary>();
 
             void Traverse(ChapterCourseModel ch, int depth)
             {
                 totalChaps++;
                 maxDepth = Math.Max(maxDepth, depth);
-                int vidsHere = ch.Videos?.Count ?? 0;
-                totalVideos += vidsHere;
+                totalVideos += ch.Videos?.Count ?? 0;
+
                 if (depth == 1)
-                {
-                    chapterSummaries.Add(new ChapterSummary
+                    summaries.Add(new ChapterSummary
                     {
                         Title = ch.Title,
-                        Info = $"Видео: {vidsHere}, Подглав: {(ch.Chapters?.Count ?? 0)}"
+                        Info = $"Видео: {ch.Videos?.Count ?? 0}, Подглав: {ch.Chapters?.Count ?? 0}"
                     });
-                }
+
                 if (ch.Chapters != null)
-                {
                     foreach (var c in ch.Chapters)
-                    {
                         Traverse(c, depth + 1);
-                    }
-                }
             }
 
             Traverse(model.MainChapter, 1);
@@ -186,27 +231,29 @@ namespace Smotrel.DialogWindows
             stats.TotalVideos = totalVideos;
             stats.TotalChapters = totalChaps;
             stats.MaxDepth = maxDepth;
-            stats.ChapterSummaries = chapterSummaries;
-
+            stats.ChapterSummaries = summaries;
             return stats;
         }
 
+        // ── Кнопка "Добавить" ─────────────────────────────────────────────────
+
         private void AddButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!IsAddEnabled)
+            if (!IsAddEnabled || OutCourseModel == null)
             {
-                MessageBox.Show(this, "Укажите путь до желаемого курса.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, "Укажите путь до желаемого курса.", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            if (OutCourseModel != null)
-            {
-                OutCourseModel.Label = string.IsNullOrWhiteSpace(CourseTitle) ? OutCourseModel.Label : CourseTitle;
-            }
+            OutCourseModel.Label =
+                string.IsNullOrWhiteSpace(CourseTitle) ? OutCourseModel.Label : CourseTitle;
 
             DialogResult = true;
             Close();
         }
+
+        // ── Управление окном ──────────────────────────────────────────────────
 
         private void Header_Down(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
@@ -215,10 +262,14 @@ namespace Smotrel.DialogWindows
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            _cts?.Cancel();
             Close();
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string propName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
+        // ── INotifyPropertyChanged ────────────────────────────────────────────
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void Notify([CallerMemberName] string? p = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(p));
     }
 }

@@ -2,6 +2,7 @@
 using Smotrel.Controls;
 using Smotrel.DialogWindows;
 using Smotrel.Models;
+using Smotrel.Services;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -46,7 +47,8 @@ namespace Smotrel.Views
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-
+            var settingsWindow = new SettingsWindow();  
+            settingsWindow.ShowDialog();
         }
 
 
@@ -150,46 +152,27 @@ namespace Smotrel.Views
             }
         }
 
-        private void CourseCardPlayBtn_Click(object sender, RoutedEventArgs e)
+        private async void CourseCardPlayBtn_Click(object sender, RoutedEventArgs e)
         {
             if (e.OriginalSource is not CourseCard card) return;
             if (card.DataContext is not CourseCardModel model) return;
 
-            var courseId = model.CourseId;
+            IsEnabled = false;
 
-            var course = Context.Courses
-                .Include(c => c.MainChapter)
-                .AsSplitQuery()
-                .SingleOrDefault(c => c.Id == courseId);
-
-            if (course?.MainChapter == null) return;
-
-            void LoadChapterTree(ChapterCourseModel chapter)
+            try
             {
-                Context.Entry(chapter)
-                    .Collection(c => c.Videos)
-                    .Query()
-                    .OrderBy(v => v.RelativeIndex)
-                    .Load();
+                var loader = new CourseLoadService(Context);
+                var course = await loader.LoadAsync(model.CourseId);
 
-                Context.Entry(chapter)
-                    .Collection(c => c.Chapters)
-                    .Query()
-                    .OrderBy(c => c.RelativeIndex)
-                    .Load();
+                if (course == null) return;
 
-                foreach (var child in chapter.Chapters)
-                {
-                    LoadChapterTree(child);
-                }
+                new MainPlayer(course).Show();
+                Close();
             }
-
-            LoadChapterTree(course.MainChapter);
-
-            var mainPlayWindow = new MainPlayer(course);
-            mainPlayWindow.Show();
-
-            Close();
+            finally
+            {
+                IsEnabled = true;
+            }
         }
     }
 }
