@@ -41,6 +41,8 @@ namespace Smotrel.Controls
             _positionTimer.Interval = TimeSpan.FromMilliseconds(250);
             _positionTimer.Tick += PositionTimer_Tick;
 
+            Timeline.SeekStarted += Timeline_SeekStarted;
+            Timeline.SeekCompleted += Timeline_SeekCompleted; ;
             // Таймер завершения скраббинга — восстанавливает звук через 120ms
             // после последнего движения ползунка
             _scrubEndTimer.Interval = TimeSpan.FromMilliseconds(120);
@@ -52,7 +54,20 @@ namespace Smotrel.Controls
             VolumeBar.Value = Volume;
             UpdateVolumeGlyph();
 
+            _positionTimer.Start();
+
             Loaded += (_, _) => { ShowOverlay(); Focus(); };
+        }
+        private PlayerState _pastState = PlayerState.Paused;
+        private void Timeline_SeekStarted(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            _pastState = PlayerState;
+            PlayerState = PlayerState.Paused;
+        }
+
+        private void Timeline_SeekCompleted(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            PlayerState = _pastState;
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -75,7 +90,11 @@ namespace Smotrel.Controls
         {
             var p = (SmotrelPlayer)d;
             if (e.NewValue is string path && !string.IsNullOrWhiteSpace(path))
+            {
                 p.Media.Source = new Uri(path);
+                p.Media.Play();
+                p.PlayerState = PlayerState.Playing;
+            }
             else
                 p.Media.Source = null;
         }
@@ -431,9 +450,6 @@ namespace Smotrel.Controls
 
             Media.Volume = IsMuted ? 0 : Volume;
             Media.SpeedRatio = _playbackSpeed;
-
-            // Дефолт PlayerState = Playing → callback запустит Media.Play()
-            PlayerState = PlayerState.Playing;
         }
 
         private void Media_MediaEnded(object sender, RoutedEventArgs e)
@@ -694,7 +710,7 @@ namespace Smotrel.Controls
             double vol = IsMuted ? 0.0 : Volume;
             GlyphVolume.Text = vol switch
             {
-                0.0 => "\uE970",
+                0.0 => "\uE992",
                 <= 0.33 => "\uE993",
                 <= 0.66 => "\uE994",
                 _ => "\uE995",

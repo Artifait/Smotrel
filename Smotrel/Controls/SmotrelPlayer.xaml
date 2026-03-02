@@ -52,8 +52,8 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="Check" Grid.Column="0"
-                                           Text="&#xE73E;" FontFamily="Segoe MDL2 Assets"
-                                           FontSize="10" Foreground="#FF0033"
+                                           Text="&#xF0D6;" FontFamily="Segoe MDL2 Assets"
+                                           FontSize="10" Foreground="#FF0033" FontWeight="Bold"
                                            VerticalAlignment="Center" Visibility="Collapsed"/>
                                 <ContentPresenter Grid.Column="1" ContentSource="Header"
                                                   VerticalAlignment="Center"/>
@@ -115,7 +115,7 @@
             </Border>
 
             <!-- Нижняя панель -->
-            <Grid Grid.Row="2" IsHitTestVisible="True">
+            <Grid Grid.Row="2" IsHitTestVisible="True" Margin="0,0,0,10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="20"/>
                     <RowDefinition Height="44"/>
@@ -151,7 +151,7 @@
                         <Button x:Name="BtnPlayPause" Width="42" Height="42" Padding="6"
                                 ToolTip="Воспроизведение / Пауза"
                                 Style="{StaticResource PlayerIconBtn}" Click="BtnPlayPause_Click">
-                            <TextBlock x:Name="GlyphPlayPause" Text="&#xE768;"
+                            <TextBlock x:Name="GlyphPlayPause" Text="&#xE769;"
                                        FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="White"/>
                         </Button>
                         <Button x:Name="BtnNext" Width="36" Height="36" Padding="6"
@@ -251,7 +251,7 @@
                         <Button x:Name="BtnPip" Width="36" Height="36" Padding="6"
                                 ToolTip="Картинка в картинке"
                                 Style="{StaticResource PlayerIconBtn}" Click="BtnPip_Click">
-                            <TextBlock Text="&#xEF15;" FontFamily="Segoe MDL2 Assets"
+                            <TextBlock Text="&#xE923;" FontFamily="Segoe MDL2 Assets"
                                        FontSize="16" Foreground="White"/>
                         </Button>
 

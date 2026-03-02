@@ -1,0 +1,116 @@
+<Window x:Class="Smotrel.DialogWindows.AddTimecodeDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Добавить метку"
+        Width="360" SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Border Background="{StaticResource WindowBackgroundBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Шапка -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource HeaderBackgroundBrush}"
+                    CornerRadius="9,9,0,0"
+                    MouseLeftButtonDown="Header_Down">
+                <Grid>
+                    <TextBlock Text="Добавить метку"
+                               Foreground="{StaticResource GlyphBrush}"
+                               FontFamily="Rockwell" FontSize="16"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Button HorizontalAlignment="Right" Width="40"
+                            Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets"
+                            Foreground="{StaticResource WhiteBrush}"
+                            Click="Cancel_Click" Style="{StaticResource ExitBtn}"/>
+                </Grid>
+            </Border>
+
+            <!-- Тело -->
+            <StackPanel Grid.Row="1" Margin="20,16,20,20">
+
+                <!-- Позиция -->
+                <TextBlock Text="Позиция (М:СС или Ч:ММ:СС)"
+                           Foreground="{StaticResource LightGrayBrush}"
+                           FontFamily="Arial" FontSize="12" Margin="0,0,0,6"/>
+
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="TbPos"
+                             Background="{StaticResource ButtonDarkBrush}"
+                             Foreground="White"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             BorderThickness="1"
+                             Padding="8,6" CaretBrush="White"
+                             FontFamily="Arial" FontSize="14"
+                             VerticalContentAlignment="Center"
+                             KeyDown="TbPos_KeyDown"/>
+
+                    <Button Grid.Column="2" Content="Текущее"
+                            Width="80" Height="34"
+                            Style="{StaticResource DarkButtonStyle}"
+                            Foreground="{StaticResource GlyphBrush}"
+                            FontSize="12"
+                            Click="UseCurrentTime_Click"/>
+                </Grid>
+
+                <!-- Ошибка -->
+                <TextBlock x:Name="TbError"
+                           Text="Неверный формат. Используйте М:СС или Ч:ММ:СС"
+                           Foreground="#FF4444"
+                           FontFamily="Arial" FontSize="11"
+                           Margin="0,0,0,6"
+                           Visibility="Collapsed"/>
+
+                <!-- Название -->
+                <TextBlock Text="Название метки"
+                           Foreground="{StaticResource LightGrayBrush}"
+                           FontFamily="Arial" FontSize="12" Margin="0,10,0,6"/>
+
+                <TextBox x:Name="TbLabel"
+                         Background="{StaticResource ButtonDarkBrush}"
+                         Foreground="White"
+                         BorderBrush="{StaticResource BorderBrush}"
+                         BorderThickness="1"
+                         Padding="8,6" CaretBrush="White"
+                         FontFamily="Arial" FontSize="13"
+                         VerticalContentAlignment="Center"
+                         Margin="0,0,0,20"
+                         KeyDown="TbLabel_KeyDown"/>
+
+                <!-- Кнопки -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Content="Отмена"
+                            Height="36" Click="Cancel_Click"
+                            Style="{StaticResource DarkButtonStyle}"
+                            Foreground="{StaticResource GlyphBrush}"/>
+
+                    <Button Grid.Column="2" Content="Добавить"
+                            Height="36" Click="Add_Click"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Foreground="{StaticResource GlyphBrush}"/>
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

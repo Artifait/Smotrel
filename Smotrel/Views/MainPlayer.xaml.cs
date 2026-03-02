@@ -7,6 +7,7 @@ using Smotrel.Settings;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace Smotrel.Views
 {
@@ -36,6 +37,8 @@ namespace Smotrel.Views
         private IList<ITimecode> _currentTimecodes = [];
 
         // ── Режим и активный плеер ────────────────────────────────────────────
+        private readonly DispatcherTimer _navUpdateTimer = new()
+        { Interval = TimeSpan.FromMilliseconds(500) };
 
         private PlayerMode _currentMode = PlayerMode.Normal;
         private SmotrelPlayer _activePlayer => _currentMode switch
@@ -61,6 +64,30 @@ namespace Smotrel.Views
 
             Loaded += OnWindowStateChanged;
             Loaded += OnLoaded;
+
+            _navUpdateTimer.Tick += (_, _) => Nav.UpdatePosition(_activePlayer.CurrentTime);
+            _navUpdateTimer.Start();
+
+        }
+
+        private void Nav_VideoRequested(VideoModel video)
+        {
+            LoadVideoIntoActive(video);
+        }
+
+        private void Nav_SeekRequested(TimeSpan pos)
+        {
+            _activePlayer.SeekTo(pos);
+        }
+
+        private void Nav_TimecodeChanged(VideoModel video)
+        {
+            // Пересобрать таймкоды в плеере если это текущее видео
+            if (_currentVideo?.Id == video.Id)
+            {
+                var timecodes = BuildTimecodes(video);
+                _activePlayer.Timeline.Timecodes = timecodes;
+            }
         }
 
         // ── Инициализация ─────────────────────────────────────────────────────
@@ -70,6 +97,7 @@ namespace Smotrel.Views
             _currentVideo = Course.GetVideoByAbsoluteIndex(0);
             if (_currentVideo == null) return;
             LoadVideoIntoActive(_currentVideo);
+            Nav.Initialize(Course, MainWindow.Context);
         }
 
         // ── Загрузка видео ────────────────────────────────────────────────────
@@ -79,6 +107,7 @@ namespace Smotrel.Views
             _currentVideo = video;
             _currentTimecodes = BuildTimecodes(video);
             _activePlayer.LoadVideo(video, _currentTimecodes);
+            Nav.SetCurrentVideo(video);
         }
 
         private static IList<ITimecode> BuildTimecodes(VideoModel video)
@@ -219,7 +248,7 @@ namespace Smotrel.Views
         //  СОБЫТИЯ SmotrelPlayer (Bubble — приходят от любого из трёх плееров)
         // ════════════════════════════════════════════════════════════════════════
 
-        private void Player_PlaybackStateChanged(object sender, RoutedEventArgs e) { }
+        private void Player_PlaybackStateChanged(object sender, RoutedEventArgs e) { Nav.UpdatePosition(_activePlayer.CurrentTime); }
 
         private void Player_PlaybackEnded(object sender, RoutedEventArgs e)
         {

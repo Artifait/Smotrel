@@ -6,7 +6,6 @@
         Width="840" Height="480"
         MinWidth="240" MinHeight="135"
         WindowStyle="None"
-        ResizeMode="CanResizeWithGrip"
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"

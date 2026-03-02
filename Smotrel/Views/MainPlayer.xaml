@@ -12,7 +12,7 @@
         Background="Transparent"
         ResizeMode="CanResizeWithGrip"
         StateChanged="OnWindowStateChanged"
-        KeyDown="MainPlayer_KeyDown">
+        PreviewKeyDown="MainPlayer_KeyDown">
 
     <Border Background="{StaticResource WindowBackgroundBrush}"
             BorderThickness="1"
@@ -125,18 +125,12 @@
                                   ResizeBehavior="PreviousAndNext"/>
 
                     <!-- Боковая навигационная панель (placeholder) -->
-                    <Border x:Name="Sidebar"
-                            Grid.Column="0"
-                            Background="{StaticResource StatsPanelBackgroundBrush}"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            BorderThickness="1,0,0,0">
-                        <TextBlock Text="Навигация по курсу"
-                                   Foreground="{StaticResource EmptyMessageBrush}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontSize="14" FontFamily="Arial"
-                                   FontStyle="Italic"/>
-                    </Border>
+                    <ctrls:CourseNavigationControl
+                        x:Name="Nav"
+                        Grid.Column="0"
+                        VideoRequested="Nav_VideoRequested"
+                        SeekRequested="Nav_SeekRequested"
+                        TimecodeChanged="Nav_TimecodeChanged"/>
                 </Grid>
             </Grid>
 
