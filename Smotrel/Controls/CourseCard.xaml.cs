@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -77,7 +78,7 @@ namespace Smotrel.Controls
                 }
                 else
                 {
-                    control.ItemBorder.BorderBrush = control.ItemBorder.Background;
+                    control.ItemBorder.BorderBrush = Application.Current.FindResource("BorderNormalBrush") as SolidColorBrush;
                 }
             }
         }
@@ -118,7 +119,7 @@ namespace Smotrel.Controls
             {
                 if (!IsSelected)
                 {
-                    card.ItemBorder.BorderBrush = card.ItemBorder.Background;
+                    card.ItemBorder.BorderBrush = Application.Current.FindResource("BorderNormalBrush") as SolidColorBrush;
                 }
             }
         }

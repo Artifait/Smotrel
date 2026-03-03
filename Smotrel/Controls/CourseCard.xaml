@@ -9,9 +9,9 @@
                  d:DesignHeight="80" d:DesignWidth="790">
     <Grid>
         <local:DashedBorder x:Name="ItemBorder" Padding="10" StrokeDashArray="5 2"
-                            Background="#242424" CornerRadius="4" AnimationDuration="0:0:40"
+                            Background="{StaticResource CardBackgroundBrush}" CornerRadius="4" AnimationDuration="0:0:40"
                             UseDashedBorder="False" DashedBorderBrush="White"
-                            BorderThickness="3" BorderBrush="#242424">
+                            BorderThickness="3" BorderBrush="{StaticResource BorderNormalBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

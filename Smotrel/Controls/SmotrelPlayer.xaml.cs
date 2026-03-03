@@ -1,3 +1,87 @@
+// ════════════════════════════════════════════════════════════════════════════════
+//  SmotrelPlayer.xaml.cs  —  рефакторинг состояния плеера
+// ════════════════════════════════════════════════════════════════════════════════
+//
+//  ПРОБЛЕМЫ ОРИГИНАЛА (все исправлены):
+//
+//  1. _positionTimer.Stop() в Media_MediaEnded не перезапускался при следующем
+//     LoadVideo, потому что PlayerState не менялся → время зависало навсегда.
+//
+//  2. Media_MediaEnded не обновлял PlayerState → кнопка Play/Pause и иконка
+//     оставались в состоянии "играет", хотя MediaElement уже остановился.
+//
+//  3. OnPlayerStateChanged вызывал Media.Play() до того как MediaOpened сработал
+//     (источник ещё не загружен) — при этом если media.NaturalDuration.HasTimeSpan
+//     == false, таймер тикал впустую, потом дополнительно зависал.
+//
+//  4. Timeline_SeekStarted менял PlayerState → поднимал PlaybackStateChangedEvent
+//     в MainPlayer → лишние обращения к Nav.UpdatePosition во время скраббинга.
+//
+//  5. OnFilePathChanged дублировал логику LoadVideo и вёл себя несовместимо с ней.
+//
+// ════════════════════════════════════════════════════════════════════════════════
+//
+//  ЖИЗНЕННЫЙ ЦИКЛ MediaElement
+//  ───────────────────────────
+//
+//    LoadVideo(video, timecodes, startPos)
+//      │  Устанавливает Media.Source = new Uri(...)
+//      │  _isMediaReady = false  →  таймер позиции ОСТАНОВЛЕН
+//      │  Сохраняет _pendingSeekPos / _hasPendingSeek
+//      │  НЕ вызывает Media.Play/Pause — только хранит намерение (_playIntent)
+//      │  НЕ меняет PlayerState
+//      ▼
+//    ─────── WPF загружает файл ───────
+//      ▼
+//    Media_MediaOpened  (единственное место, откуда стартует воспроизведение)
+//      │  _isMediaReady = true
+//      │  Timeline.Duration = реальная длительность
+//      │  Применяет отложенный seek (_pendingSeekPos)
+//      │  Применяет Volume / SpeedRatio
+//      │  Если PlayerState == Playing  →  Media.Play() + _positionTimer.Start()
+//      │  Если PlayerState == Paused   →  Media.Pause()
+//      ▼
+//    [воспроизведение идёт, _positionTimer тикает]
+//      ▼
+//    Media_MediaEnded  ─ или ─  Media_MediaFailed
+//      │  _isMediaReady = false
+//      │  _positionTimer.Stop()
+//      │  PlayerState = Paused          ← синхронизирует UI (кнопка, глиф)
+//      │  Ended: RaiseEvent(PlaybackEndedEvent) → MainPlayer грузит следующее
+//      ▼
+//    [ждёт следующего LoadVideo]
+//
+//  ПЕРЕХОДЫ PlayerState
+//  ────────────────────
+//
+//    OnPlayerStateChanged(Playing)
+//      │  Если _isMediaReady  →  Media.Play() + _positionTimer.Start()
+//      │  Если НЕ ready       →  ничего (MediaOpened применит состояние сам)
+//      │  Обновляет иконку, запускает анимацию, поднимает PlaybackStateChangedEvent
+//      ▼
+//    OnPlayerStateChanged(Paused)
+//      │  Media.Pause()  (безопасно вызывать даже если !_isMediaReady)
+//      │  _positionTimer.Stop()
+//      │  Обновляет иконку, поднимает PlaybackStateChangedEvent
+//      ▼
+//
+//  СКРАББИНГ (перетаскивание ползунка)
+//  ────────────────────────────────────
+//
+//    Timeline.SeekStarted
+//      →  _isScrubbing = true
+//      →  Media.Pause() напрямую (БЕЗ изменения PlayerState)
+//      →  Глушим звук (Media.Volume = 0)
+//      →  PlayerState НЕ МЕНЯЕТСЯ → PlaybackStateChangedEvent НЕ поднимается
+//
+//    Timeline.SeekCompleted
+//      →  Media.Position = финальная позиция
+//      →  Восстанавливаем Volume
+//      →  Если PlayerState == Playing  →  Media.Play() + таймер
+//      →  _isScrubbing = false
+//
+// ════════════════════════════════════════════════════════════════════════════════
+
 using Smotrel.Enums;
 using Smotrel.Events;
 using Smotrel.Interfaces;
@@ -20,14 +104,28 @@ namespace Smotrel.Controls
 
         private readonly DispatcherTimer _overlayTimer = new();
         private readonly DispatcherTimer _positionTimer = new();
-        private readonly DispatcherTimer _scrubEndTimer = new();
 
         private IList<ITimecode> _timecodes = new List<ITimecode>();
-        private PlayerState _stateBeforeLock = PlayerState.Paused;
+
+        // _isMediaReady: true только между MediaOpened и следующим LoadVideo/MediaFailed/MediaEnded.
+        // Определяет: можно ли сейчас вызывать Media.Play/Seek и читать NaturalDuration.
+        private bool _isMediaReady = false;
+
+        // _isScrubbing: пользователь тащит ползунок.
+        // Во время скраббинга: позиционный таймер пропускает тики,
+        // Media.Pause() вызван напрямую (не через PlayerState).
+        private bool _isScrubbing = false;
+        private double _volumeBeforeScrub = 1.0;
+
+        // Громкость до mute (для восстановления при снятии mute)
         private double _volumeBeforeMute = 1.0;
+
+        // Скорость воспроизведения (хранится отдельно, применяется в MediaOpened)
         private double _playbackSpeed = 1.0;
-        private bool _isScrubbing;
-        private double _volumeBeforeScrub = 1.0; // для mute во время скраббинга
+
+        // Отложенная позиция: применяется в MediaOpened после загрузки нового файла
+        private TimeSpan _pendingSeekPos = TimeSpan.Zero;
+        private bool _hasPendingSeek = false;
 
         // ── Конструктор ───────────────────────────────────────────────────────
 
@@ -41,12 +139,9 @@ namespace Smotrel.Controls
             _positionTimer.Interval = TimeSpan.FromMilliseconds(250);
             _positionTimer.Tick += PositionTimer_Tick;
 
+            // SeekStarted/SeekCompleted используют прямые вызовы Media без изменения PlayerState
             Timeline.SeekStarted += Timeline_SeekStarted;
-            Timeline.SeekCompleted += Timeline_SeekCompleted; ;
-            // Таймер завершения скраббинга — восстанавливает звук через 120ms
-            // после последнего движения ползунка
-            _scrubEndTimer.Interval = TimeSpan.FromMilliseconds(120);
-            _scrubEndTimer.Tick += ScrubEndTimer_Tick;
+            Timeline.SeekCompleted += Timeline_SeekCompleted;
 
             MouseMove += OnMouseActivity;
             MouseDown += OnMouseActivity;
@@ -54,20 +149,8 @@ namespace Smotrel.Controls
             VolumeBar.Value = Volume;
             UpdateVolumeGlyph();
 
-            _positionTimer.Start();
-
+            // Таймер НЕ запускается здесь — только после MediaOpened
             Loaded += (_, _) => { ShowOverlay(); Focus(); };
-        }
-        private PlayerState _pastState = PlayerState.Paused;
-        private void Timeline_SeekStarted(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            _pastState = PlayerState;
-            PlayerState = PlayerState.Paused;
-        }
-
-        private void Timeline_SeekCompleted(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            PlayerState = _pastState;
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -75,6 +158,9 @@ namespace Smotrel.Controls
         // ════════════════════════════════════════════════════════════════════════
 
         // ── FilePath ─────────────────────────────────────────────────────────
+        //  Устаревший путь загрузки. Используйте LoadVideo().
+        //  Оставлен для обратной совместимости с XAML-биндингами.
+        //  НЕ вызывает Media.Play и не меняет PlayerState напрямую.
 
         public static readonly DependencyProperty FilePathProperty =
             DependencyProperty.Register(nameof(FilePath), typeof(string),
@@ -88,15 +174,16 @@ namespace Smotrel.Controls
 
         private static void OnFilePathChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
+            // Только устанавливает источник; воспроизведение начинает Media_MediaOpened.
             var p = (SmotrelPlayer)d;
             if (e.NewValue is string path && !string.IsNullOrWhiteSpace(path))
-            {
-                p.Media.Source = new Uri(path);
-                p.Media.Play();
-                p.PlayerState = PlayerState.Playing;
-            }
+                p.StartLoadingSource(new Uri(path), TimeSpan.Zero);
             else
+            {
+                p._isMediaReady = false;
+                p._positionTimer.Stop();
                 p.Media.Source = null;
+            }
         }
 
         // ── Title ────────────────────────────────────────────────────────────
@@ -115,6 +202,8 @@ namespace Smotrel.Controls
             => ((SmotrelPlayer)d).TbTitle.Text = e.NewValue as string ?? string.Empty;
 
         // ── CurrentTime ──────────────────────────────────────────────────────
+        //  Только для чтения снаружи (обновляется PositionTimer_Tick).
+        //  Внешняя запись игнорируется если _isScrubbing == true.
 
         public static readonly DependencyProperty CurrentTimeProperty =
             DependencyProperty.Register(nameof(CurrentTime), typeof(TimeSpan),
@@ -130,8 +219,11 @@ namespace Smotrel.Controls
         {
             var p = (SmotrelPlayer)d;
             var pos = (TimeSpan)e.NewValue;
-            if (!p._isScrubbing && p.Media.NaturalDuration.HasTimeSpan)
+
+            // Внешний SeekTo → двигаем MediaElement (только если готов и не скробим)
+            if (!p._isScrubbing && p._isMediaReady)
                 p.Media.Position = pos;
+
             p.UpdateTimeLabel(pos);
             p.UpdateChapterLabel(pos);
             p.UpdateTimelineValue(pos);
@@ -175,6 +267,7 @@ namespace Smotrel.Controls
         {
             var p = (SmotrelPlayer)d;
             bool on = (bool)e.NewValue;
+
             if (on)
             {
                 p._volumeBeforeMute = p.Volume;
@@ -187,10 +280,18 @@ namespace Smotrel.Controls
                 p.Media.Volume = p._volumeBeforeMute;
                 p.VolumeBar.Value = p._volumeBeforeMute;
             }
+
             p.UpdateVolumeGlyph();
         }
 
         // ── PlayerState ──────────────────────────────────────────────────────
+        //
+        //  Единственный источник истины об «намерении» воспроизведения.
+        //
+        //  Важно: PlayerState НЕ гарантирует что MediaElement прямо сейчас играет —
+        //  он может быть Playing пока _isMediaReady == false (медиа ещё грузится).
+        //  Реальный запуск Media.Play() происходит только в OnPlayerStateChanged
+        //  (если _isMediaReady) или в Media_MediaOpened (применяет сохранённое намерение).
 
         public static readonly DependencyProperty PlayerStateProperty =
             DependencyProperty.Register(nameof(PlayerState), typeof(PlayerState),
@@ -211,22 +312,28 @@ namespace Smotrel.Controls
 
             if (newState == PlayerState.Playing)
             {
-                p.Media.Play();
-                p._positionTimer.Start();
-                p.GlyphPlayPause.Text = "\uE769";
+                // Реальный вызов Media.Play() только если медиа уже открыта.
+                // Иначе: MediaOpened сам вызовет Play, увидев PlayerState == Playing.
+                if (p._isMediaReady)
+                {
+                    p.Media.Play();
+                    p._positionTimer.Start();
+                }
+                p.GlyphPlayPause.Text = "\uE769"; // Pause icon (показываем пока играет)
             }
-            else
+            else // Paused
             {
+                // Pause можно вызывать всегда — MediaElement игнорирует, если не готов
                 p.Media.Pause();
                 p._positionTimer.Stop();
-                p.GlyphPlayPause.Text = "\uE768";
+                p.GlyphPlayPause.Text = "\uE768"; // Play icon
             }
 
             p.RunPlayStateAnimation(newState);
             p.RaiseEvent(new PlayerStateChangedEventArgs(PlaybackStateChangedEvent, oldState, newState));
         }
 
-        // ── PlayerMode — управляет видимостью кнопок ─────────────────────────
+        // ── PlayerMode ───────────────────────────────────────────────────────
 
         public static readonly DependencyProperty PlayerModeProperty =
             DependencyProperty.Register(nameof(PlayerMode), typeof(PlayerMode),
@@ -247,27 +354,24 @@ namespace Smotrel.Controls
             switch (mode)
             {
                 case PlayerMode.Normal:
-                    // Все кнопки видны, кнопки Fullscreen/PiP видны, ExitMode — нет
                     p.BtnFullscreen.Visibility = Visibility.Visible;
                     p.BtnPip.Visibility = Visibility.Visible;
                     p.BtnExitMode.Visibility = Visibility.Collapsed;
                     break;
 
                 case PlayerMode.Fullscreen:
-                    // Только кнопка выхода из fullscreen (E73F = "свернуть окно")
                     p.BtnFullscreen.Visibility = Visibility.Collapsed;
                     p.BtnPip.Visibility = Visibility.Collapsed;
                     p.BtnExitMode.Visibility = Visibility.Visible;
-                    p.GlyphExitMode.Text = "\uE73F"; // collapse / exit fullscreen
+                    p.GlyphExitMode.Text = "\uE73F";
                     p.BtnExitMode.ToolTip = "Выйти из полноэкранного режима";
                     break;
 
                 case PlayerMode.PiP:
-                    // Только кнопка возврата в основное окно (E9A6)
                     p.BtnFullscreen.Visibility = Visibility.Collapsed;
                     p.BtnPip.Visibility = Visibility.Collapsed;
                     p.BtnExitMode.Visibility = Visibility.Visible;
-                    p.GlyphExitMode.Text = "\uE9A6"; // picture in picture exit
+                    p.GlyphExitMode.Text = "\uE9A6";
                     p.BtnExitMode.ToolTip = "Вернуть в основное окно";
                     break;
             }
@@ -289,9 +393,11 @@ namespace Smotrel.Controls
         {
             var p = (SmotrelPlayer)d;
             bool locked = (bool)e.NewValue;
+
             if (locked)
             {
-                p._stateBeforeLock = p.PlayerState;
+                // Блокируем: пауза в MediaElement напрямую, PlayerState не меняем.
+                // PlayerState сохраняет намерение — когда разблокируем, восстановим.
                 p.Media.Pause();
                 p._positionTimer.Stop();
                 p.GlyphPlayPause.Text = "\uE768";
@@ -302,8 +408,18 @@ namespace Smotrel.Controls
             {
                 p.LockOverlay.Visibility = Visibility.Collapsed;
                 p.ControlsOverlay.Visibility = Visibility.Visible;
-                if (p._stateBeforeLock == PlayerState.Playing)
-                    p.PlayerState = PlayerState.Playing;
+
+                // Восстанавливаем состояние согласно PlayerState
+                if (p._isMediaReady && p.PlayerState == PlayerState.Playing)
+                {
+                    p.Media.Play();
+                    p._positionTimer.Start();
+                    p.GlyphPlayPause.Text = "\uE769";
+                }
+                else
+                {
+                    p.GlyphPlayPause.Text = "\uE768";
+                }
             }
         }
 
@@ -403,10 +519,6 @@ namespace Smotrel.Controls
             remove => RemoveHandler(VolumeChangedEvent, value);
         }
 
-        /// <summary>
-        /// Пользователь запросил смену режима окна.
-        /// MainPlayer обрабатывает этот ивент, сам SmotrelPlayer ничего не перемещает.
-        /// </summary>
         public static readonly RoutedEvent VideoWindowStateChangedEvent =
             EventManager.RegisterRoutedEvent(nameof(VideoWindowStateChanged),
                 RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SmotrelPlayer));
@@ -420,49 +532,163 @@ namespace Smotrel.Controls
         //  ПУБЛИЧНЫЙ API
         // ════════════════════════════════════════════════════════════════════════
 
-        public void LoadVideo(IVideo video, IEnumerable<ITimecode>? timecodes = null)
+        /// <summary>
+        /// Основной метод загрузки видео.
+        ///
+        /// Что происходит:
+        ///   1. Сохраняем timecodes и startPos
+        ///   2. Вызываем StartLoadingSource → помечаем _isMediaReady = false,
+        ///      останавливаем таймер, устанавливаем Media.Source
+        ///   3. PlayerState НЕ МЕНЯЕТСЯ — MainPlayer должен задать нужное состояние
+        ///      до или после вызова LoadVideo
+        ///   4. Когда WPF загрузит медиа → Media_MediaOpened применит PlayerState
+        /// </summary>
+        public void LoadVideo(IVideo video, IList<ITimecode> timecodes,
+                              TimeSpan startPosition = default)
         {
-            _timecodes = timecodes?.ToList() ?? new List<ITimecode>();
-            Timeline.Timecodes = _timecodes;
-            Title = video.Title;
-            FilePath = video.FilePath;
-            SetValue(CurrentTimeProperty, TimeSpan.Zero);
+            if (video?.FilePath == null) return;
+
+            _timecodes = timecodes ?? new List<ITimecode>();
+            Timeline.Timecodes = _timecodes.Cast<ITimecode>().ToList();
+
+            StartLoadingSource(new Uri(video.FilePath), startPosition);
         }
 
-        /// <summary>Программный переход на позицию (без поднятия события).</summary>
+        /// <summary>
+        /// Программный переход на позицию без поднятия событий.
+        /// Можно вызывать только когда медиа уже открыта (_isMediaReady == true).
+        /// </summary>
         public void SeekTo(TimeSpan position)
         {
-            if (Media.NaturalDuration.HasTimeSpan)
-                Media.Position = position;
+            if (!_isMediaReady) return;
+            Media.Position = position;
             SetValue(CurrentTimeProperty, position);
         }
 
+        // ── Внутренняя инициализация загрузки ────────────────────────────────
+
+        /// <summary>
+        /// Общая точка установки нового источника.
+        /// Вызывается из LoadVideo и OnFilePathChanged.
+        /// </summary>
+        private void StartLoadingSource(Uri uri, TimeSpan startPosition)
+        {
+            // Сбрасываем "готовность" медиа — до MediaOpened нельзя играть/искать
+            _isMediaReady = false;
+            _positionTimer.Stop();
+
+            // Сбрасываем отображение времени
+            SetValue(CurrentTimeProperty, TimeSpan.Zero);
+            Timeline.Value = 0;
+            Timeline.Duration = TimeSpan.Zero;
+
+            // Сохраняем отложенный seek (применится в Media_MediaOpened)
+            _pendingSeekPos = startPosition;
+            _hasPendingSeek = startPosition > TimeSpan.Zero;
+
+            Media.Source = uri;
+
+            // Синхронизируем кнопку с текущим намерением (PlayerState)
+            GlyphPlayPause.Text = PlayerState == PlayerState.Playing ? "\uE769" : "\uE768";
+        }
+
         // ════════════════════════════════════════════════════════════════════════
-        //  MEDIAELMENT СОБЫТИЯ
+        //  MEDIAELEMENT СОБЫТИЯ
         // ════════════════════════════════════════════════════════════════════════
 
+        /// <summary>
+        /// Медиа открыта и готова к воспроизведению.
+        ///
+        /// Вызывается WPF автоматически после установки Media.Source.
+        /// Это ЕДИНСТВЕННОЕ место откуда стартует воспроизведение после загрузки файла.
+        ///
+        /// После этого события:
+        ///   - Media.NaturalDuration.HasTimeSpan == true
+        ///   - Media.Position можно читать и писать
+        ///   - Media.Play() даст реальное воспроизведение
+        /// </summary>
         private void Media_MediaOpened(object sender, RoutedEventArgs e)
         {
             if (!Media.NaturalDuration.HasTimeSpan) return;
 
-            Timeline.Duration = Media.NaturalDuration.TimeSpan;
-            UpdateTimeLabel(TimeSpan.Zero);
+            _isMediaReady = true;
 
+            var duration = Media.NaturalDuration.TimeSpan;
+            Timeline.Duration = duration;
+
+            // Применяем настройки, которые могли быть заданы до загрузки
             Media.Volume = IsMuted ? 0 : Volume;
             Media.SpeedRatio = _playbackSpeed;
+
+            // Применяем отложенный seek
+            if (_hasPendingSeek && _pendingSeekPos < duration)
+            {
+                Media.Position = _pendingSeekPos;
+                SetValue(CurrentTimeProperty, _pendingSeekPos);
+            }
+            else
+            {
+                UpdateTimeLabel(TimeSpan.Zero);
+            }
+            _hasPendingSeek = false;
+            _pendingSeekPos = TimeSpan.Zero;
+
+            // Применяем намерение воспроизведения (PlayerState, заданный снаружи)
+            // Если плеер заблокирован — не трогаем
+            if (!IsLocked)
+            {
+                if (PlayerState == PlayerState.Playing)
+                {
+                    Media.Play();
+                    _positionTimer.Start();
+                }
+                else
+                {
+                    Media.Pause();
+                }
+            }
         }
 
+        /// <summary>
+        /// Воспроизведение достигло конца файла.
+        ///
+        /// После этого события:
+        ///   - Media.Position == NaturalDuration
+        ///   - Media.Play() не даст ничего (нужен seek + play)
+        ///   - Следующий LoadVideo сбросит всё и запустит новую загрузку
+        ///
+        /// Здесь обязательно синхронизируем PlayerState с реальностью:
+        /// MediaElement уже остановился, PlayerState должен это отражать.
+        /// </summary>
         private void Media_MediaEnded(object sender, RoutedEventArgs e)
         {
+            _isMediaReady = false;
             _positionTimer.Stop();
-            // Не меняем PlayerState — пусть MainPlayer решает что делать
+
             Timeline.Value = 1.0;
+
+            // ВАЖНО: синхронизируем PlayerState — иначе иконка Play/Pause
+            // останется в состоянии "играет", хотя MediaElement уже стоит.
+            // SetValue обходит CoerceValue и не дублирует события если значение уже Paused.
+            SetValue(PlayerStateProperty, PlayerState.Paused);
+            GlyphPlayPause.Text = "\uE768";
+
+            // Уведомляем MainPlayer — он загрузит следующее видео через LoadVideoIntoActive
             RaiseEvent(new RoutedEventArgs(PlaybackEndedEvent));
         }
 
+        /// <summary>
+        /// Ошибка загрузки или воспроизведения.
+        ///
+        /// Синхронизируем UI так же как при MediaEnded.
+        /// </summary>
         private void Media_MediaFailed(object? sender, ExceptionRoutedEventArgs e)
         {
+            _isMediaReady = false;
             _positionTimer.Stop();
+
+            SetValue(PlayerStateProperty, PlayerState.Paused);
+            GlyphPlayPause.Text = "\uE768";
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -472,32 +698,30 @@ namespace Smotrel.Controls
         private void OverlayTimer_Tick(object? sender, EventArgs e)
         {
             _overlayTimer.Stop();
-            if (PlayerState == PlayerState.Playing)
+            if (PlayerState == PlayerState.Playing && !IsLocked)
             {
                 HideOverlay();
-                // Скрываем курсор вместе с оверлеем
                 RootGrid.Cursor = Cursors.None;
             }
         }
 
+        /// <summary>
+        /// Тикает каждые 250ms пока PlayerState == Playing и _isMediaReady.
+        /// Обновляет CurrentTime, ProgressBar, метку времени.
+        /// Пропускает обновление во время скраббинга (_isScrubbing).
+        /// </summary>
         private void PositionTimer_Tick(object? sender, EventArgs e)
         {
-            if (_isScrubbing || !Media.NaturalDuration.HasTimeSpan) return;
+            // Двойная проверка: таймер мог тикнуть после смены состояния
+            if (_isScrubbing || !_isMediaReady || !Media.NaturalDuration.HasTimeSpan) return;
 
             var pos = Media.Position;
+
+            // SetValue вместо свойства — чтобы не дёргать Media.Position (уже прочитали его)
             SetValue(CurrentTimeProperty, pos);
             UpdateTimeLabel(pos);
             UpdateChapterLabel(pos);
             UpdateTimelineValue(pos);
-        }
-
-        private void ScrubEndTimer_Tick(object? sender, EventArgs e)
-        {
-            _scrubEndTimer.Stop();
-            _isScrubbing = false;
-
-            // Восстанавливаем громкость после скраббинга
-            Media.Volume = IsMuted ? 0 : _volumeBeforeScrub;
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -506,8 +730,7 @@ namespace Smotrel.Controls
 
         private void ShowOverlay()
         {
-            // Возвращаем курсор
-            RootGrid.Cursor = null; // наследует от родителя (обычно Arrow)
+            RootGrid.Cursor = null;
 
             ControlsOverlay.IsHitTestVisible = true;
             var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(150));
@@ -524,53 +747,31 @@ namespace Smotrel.Controls
             ControlsOverlay.BeginAnimation(OpacityProperty, anim);
         }
 
-        private void OnMouseActivity(object sender, MouseEventArgs e)
-        {
-            ShowOverlay();
-        }
-
-        // ── Одиночный клик = Play/Pause ───────────────────────────────────────
+        private void OnMouseActivity(object sender, MouseEventArgs e) => ShowOverlay();
 
         protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
         {
             base.OnMouseLeftButtonDown(e);
 
-            // Кликнули на кнопку управления — не реагируем
             if (e.OriginalSource is TextBlock tb && tb.Parent is Button) return;
             if (e.OriginalSource is Button) return;
 
             if (e.ClickCount == 1)
-            {
                 TogglePlayPause();
-                // e.Handled остаётся false — PipPlayer может вызвать DragMove
-            }
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        //  ГОРЯЧИЕ КЛАВИШИ (вызывается из MainPlayer/PipPlayer)
+        //  ГОРЯЧИЕ КЛАВИШИ
         // ════════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Обрабатывает горячую клавишу. Вызывать только когда игрок в фокусе.
-        /// </summary>
         public bool HandleHotkey(Key key, ModifierKeys modifiers)
         {
             if (IsLocked) return false;
 
             var s = AppSettings.Current;
 
-            // Shift+Left = предыдущее видео
-            if (key == Key.Left && modifiers == ModifierKeys.Shift)
-            {
-                RaiseEvent(new RoutedEventArgs(PreviousRequestedEvent));
-                return true;
-            }
-            // Shift+Right = следующее видео
-            if (key == Key.Right && modifiers == ModifierKeys.Shift)
-            {
-                RaiseEvent(new RoutedEventArgs(NextRequestedEvent));
-                return true;
-            }
+            if (key == Key.Left && modifiers == ModifierKeys.Shift) { RaiseEvent(new RoutedEventArgs(PreviousRequestedEvent)); return true; }
+            if (key == Key.Right && modifiers == ModifierKeys.Shift) { RaiseEvent(new RoutedEventArgs(NextRequestedEvent)); return true; }
 
             if (modifiers != ModifierKeys.None) return false;
 
@@ -589,17 +790,13 @@ namespace Smotrel.Controls
                     return true;
 
                 case Key.F:
-                    if (PlayerMode == PlayerMode.Normal)
-                        RequestWindowState(VideoWindowStateRequest.Fullscreen);
-                    else if (PlayerMode == PlayerMode.Fullscreen)
-                        RequestWindowState(VideoWindowStateRequest.Normal);
+                    if (PlayerMode == PlayerMode.Normal) RequestWindowState(VideoWindowStateRequest.Fullscreen);
+                    else if (PlayerMode == PlayerMode.Fullscreen) RequestWindowState(VideoWindowStateRequest.Normal);
                     return true;
 
                 case Key.P:
-                    if (PlayerMode == PlayerMode.Normal)
-                        RequestWindowState(VideoWindowStateRequest.PiP);
-                    else if (PlayerMode == PlayerMode.PiP)
-                        RequestWindowState(VideoWindowStateRequest.Normal);
+                    if (PlayerMode == PlayerMode.Normal) RequestWindowState(VideoWindowStateRequest.PiP);
+                    else if (PlayerMode == PlayerMode.PiP) RequestWindowState(VideoWindowStateRequest.Normal);
                     return true;
 
                 case Key.Escape:
@@ -613,18 +810,87 @@ namespace Smotrel.Controls
 
         private void Seek(TimeSpan delta)
         {
-            if (!Media.NaturalDuration.HasTimeSpan) return;
+            if (!_isMediaReady || !Media.NaturalDuration.HasTimeSpan) return;
 
             var total = Media.NaturalDuration.TimeSpan;
             var pos = Media.Position + delta;
-            pos = pos < TimeSpan.Zero ? TimeSpan.Zero
-                : pos > total ? total
-                : pos;
+            pos = pos < TimeSpan.Zero ? TimeSpan.Zero : pos > total ? total : pos;
 
             Media.Position = pos;
             SetValue(CurrentTimeProperty, pos);
             UpdateTimeLabel(pos);
             UpdateTimelineValue(pos);
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        //  СКРАББИНГ (таймлайн)
+        // ════════════════════════════════════════════════════════════════════════
+        //
+        //  SeekStarted / SeekCompleted от ClickableProgressBar.
+        //
+        //  Принцип: НЕ меняем PlayerState во время скраббинга.
+        //  Это исключает паразитные PlaybackStateChangedEvent в MainPlayer.
+        //  Вместо этого управляем MediaElement напрямую.
+
+        private void Timeline_SeekStarted(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // Глушим звук, чтобы не было треска при перемотке
+            _volumeBeforeScrub = IsMuted ? 0 : Volume;
+            Media.Volume = 0;
+
+            // Ставим на паузу напрямую (PlayerState не трогаем!)
+            if (_isMediaReady)
+                Media.Pause();
+
+            _isScrubbing = true;
+        }
+
+        private void Timeline_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // Вызывается при каждом движении ползунка (после SeekStarted)
+            if (!_isMediaReady || !Media.NaturalDuration.HasTimeSpan) return;
+
+            var pos = TimeSpan.FromSeconds(
+                Media.NaturalDuration.TimeSpan.TotalSeconds * e.NewValue);
+
+            Media.Position = pos;
+            UpdateTimeLabel(pos);
+            UpdateChapterLabel(pos);
+        }
+
+        private void Timeline_SeekCompleted(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            _isScrubbing = false;
+
+            // Восстанавливаем громкость
+            Media.Volume = _volumeBeforeScrub;
+
+            if (!_isMediaReady) return;
+
+            // Применяем финальную позицию
+            var pos = TimeSpan.FromSeconds(
+                Media.NaturalDuration.TimeSpan.TotalSeconds * e.NewValue);
+            Media.Position = pos;
+            SetValue(CurrentTimeProperty, pos);
+
+            // Возобновляем воспроизведение если так задан PlayerState
+            if (PlayerState == PlayerState.Playing && !IsLocked)
+            {
+                Media.Play();
+                _positionTimer.Start();
+            }
+        }
+
+        // ── Громкость ─────────────────────────────────────────────────────────
+
+        private void VolumeBar_ValueChanged(object sender,
+            RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (IsMuted && e.NewValue > 0) IsMuted = false;
+            Volume = e.NewValue;
+            Media.Volume = IsMuted ? 0 : e.NewValue;
+            UpdateVolumeGlyph();
+            RaiseEvent(new RoutedEventArgs(VolumeChangedEvent));
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -699,7 +965,7 @@ namespace Smotrel.Controls
 
         private void UpdateTimelineValue(TimeSpan current)
         {
-            if (_isScrubbing || !Media.NaturalDuration.HasTimeSpan) return;
+            if (_isScrubbing || !_isMediaReady || !Media.NaturalDuration.HasTimeSpan) return;
             var total = Media.NaturalDuration.TimeSpan;
             if (total.TotalSeconds > 0)
                 Timeline.Value = current.TotalSeconds / total.TotalSeconds;
@@ -757,10 +1023,7 @@ namespace Smotrel.Controls
             => RequestWindowState(VideoWindowStateRequest.Normal);
 
         private void RequestWindowState(VideoWindowStateRequest request)
-        {
-            var args = new VideoWindowStateRequestEventArgs(VideoWindowStateChangedEvent, request);
-            RaiseEvent(args);
-        }
+            => RaiseEvent(new VideoWindowStateRequestEventArgs(VideoWindowStateChangedEvent, request));
 
         private void BtnSpeed_Click(object sender, RoutedEventArgs e)
         {
@@ -784,45 +1047,6 @@ namespace Smotrel.Controls
                 Media.SpeedRatio = speed;
                 foreach (MenuItem mi in SpeedMenu.Items) mi.IsChecked = mi == item;
             }
-        }
-
-        // ── Таймлайн ─────────────────────────────────────────────────────────
-
-        private void Timeline_ValueChanged(object sender,
-            RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (!Media.NaturalDuration.HasTimeSpan) return;
-
-            // Начало скраббинга: глушим звук чтобы не было треска
-            if (!_isScrubbing)
-            {
-                _volumeBeforeScrub = IsMuted ? 0 : Volume;
-                Media.Volume = 0;
-                _isScrubbing = true;
-            }
-
-            var pos = TimeSpan.FromSeconds(
-                Media.NaturalDuration.TimeSpan.TotalSeconds * e.NewValue);
-
-            Media.Position = pos;
-            UpdateTimeLabel(pos);
-            UpdateChapterLabel(pos);
-
-            // Перезапускаем таймер окончания скраббинга
-            _scrubEndTimer.Stop();
-            _scrubEndTimer.Start();
-        }
-
-        // ── Громкость ─────────────────────────────────────────────────────────
-
-        private void VolumeBar_ValueChanged(object sender,
-            RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (IsMuted && e.NewValue > 0) IsMuted = false;
-            Volume = e.NewValue;
-            Media.Volume = IsMuted ? 0 : e.NewValue;
-            UpdateVolumeGlyph();
-            RaiseEvent(new RoutedEventArgs(VolumeChangedEvent));
         }
 
         // ── Lock overlay ──────────────────────────────────────────────────────

@@ -1,32 +1,74 @@
+﻿<!-- Themes/Brushes.xaml — полная замена -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="/Styles/Colors.xaml"/>
+        <ResourceDictionary Source="Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{StaticResource ColorWindowBackground}"/>
-    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource ColorBorder}"/>
-    <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="{StaticResource ColorHeaderBackground}"/>
-    <SolidColorBrush x:Key="GlyphBrush" Color="{StaticResource ColorGlyphGray}"/>
-    <SolidColorBrush x:Key="HoverOverlayBrush" Color="{StaticResource ColorHoverOverlay}"/>
-    <SolidColorBrush x:Key="ExitHoverBrush" Color="{StaticResource ColorExitHover}"/>
-    <SolidColorBrush x:Key="TextBoxBackgroundBrush" Color="{StaticResource ColorTextBoxBackground}"/>
-    <SolidColorBrush x:Key="TextBoxForegroundBrush" Color="{StaticResource ColorTextBoxForeground}"/>
-    <SolidColorBrush x:Key="StatsPanelBackgroundBrush" Color="{StaticResource ColorStatsPanelBackground}"/>
-    <SolidColorBrush x:Key="LightGrayBrush" Color="{StaticResource ColorLightGray}"/>
-    <SolidColorBrush x:Key="MediumGrayBrush" Color="{StaticResource ColorMediumGray}"/>
-    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource ColorWhite}"/>
-    <SolidColorBrush x:Key="DisabledBtnBgBrush" Color="{StaticResource ColorDisabledBtnBg}"/>
-    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource ColorPrimary}"/>
-    <SolidColorBrush x:Key="PrimaryForegroundBrush" Color="{StaticResource ColorPrimaryForeground}"/>
-    <SolidColorBrush x:Key="ButtonDarkBrush" Color="{StaticResource ColorButtonDark}"/>
-    <SolidColorBrush x:Key="EmptyMessageBrush" Color="{StaticResource ColorEmptyMessage}"/>
+    <!-- ── Фоны окон / слоёв ──────────────────────────────────────── -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush"
+                     Color="{StaticResource BgBase}"/>
+    <SolidColorBrush x:Key="HeaderBackgroundBrush"
+                     Color="{StaticResource BgElevated}"/>
+    <SolidColorBrush x:Key="StatsPanelBackgroundBrush"
+                     Color="{StaticResource BgPanel}"/>
+    <SolidColorBrush x:Key="CardBackgroundBrush"
+                     Color="{StaticResource BgCard}"/>
+    <SolidColorBrush x:Key="CardHoverBrush"
+                     Color="{StaticResource BgCardHover}"/>
 
-    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource ColorPrimaryHover}"/>
-    <SolidColorBrush x:Key="PrimaryPressedBrush" Color="{StaticResource ColorPrimaryPressed}"/>
+    <!-- ── Кнопки ─────────────────────────────────────────────────── -->
+    <!-- ButtonDarkBrush — фон обычных кнопок/карточек -->
+    <SolidColorBrush x:Key="ButtonDarkBrush"
+                     Color="{StaticResource BgCard}"/>
+    <SolidColorBrush x:Key="ButtonHoverBrush"
+                     Color="{StaticResource BgCardHover}"/>
+    <SolidColorBrush x:Key="ButtonActiveBrush"
+                     Color="{StaticResource BgCardActive}"/>
 
-    <SolidColorBrush x:Key="DarkHoverBrush" Color="{StaticResource ColorDarkHover}"/>
-    <SolidColorBrush x:Key="DarkPressedBrush" Color="{StaticResource ColorDarkPressed}"/>
-    
+    <!-- ── Границы ────────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="BorderBrush"
+                     Color="{StaticResource BorderSubtle}"/>
+    <SolidColorBrush x:Key="BorderNormalBrush"
+                     Color="{StaticResource BorderNormal}"/>
+    <SolidColorBrush x:Key="BorderFocusBrush"
+                     Color="{StaticResource BorderFocus}"/>
+
+    <!-- ── Текст ──────────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="TextPrimaryBrush"
+                     Color="{StaticResource TextPrimary}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush"
+                     Color="{StaticResource TextSecondary}"/>
+    <SolidColorBrush x:Key="EmptyMessageBrush"
+                     Color="{StaticResource TextMuted}"/>
+    <SolidColorBrush x:Key="TextDisabledBrush"
+                     Color="{StaticResource TextDisabled}"/>
+
+    <!-- Алиасы для совместимости с существующим XAML -->
+    <SolidColorBrush x:Key="GlyphBrush"
+                     Color="{StaticResource TextPrimary}"/>
+    <SolidColorBrush x:Key="WhiteBrush"
+                     Color="{StaticResource TextPrimary}"/>
+    <SolidColorBrush x:Key="LightGrayBrush"
+                     Color="{StaticResource TextSecondary}"/>
+
+    <!-- ── Акцент ─────────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="AccentBrush"
+                     Color="{StaticResource Accent}"/>
+    <SolidColorBrush x:Key="AccentDimBrush"
+                     Color="{StaticResource AccentDim}"/>
+    <SolidColorBrush x:Key="AccentGlowBrush"
+                     Color="{StaticResource AccentGlow}"/>
+
+    <!-- ── Семантические ─────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="SuccessBrush"
+                     Color="{StaticResource Success}"/>
+    <SolidColorBrush x:Key="DangerBrush"
+                     Color="{StaticResource Danger}"/>
+
+    <!-- ── Оверлеи ───────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="OverlayBrush"
+                     Color="{StaticResource Black60}"/>
+
 </ResourceDictionary>
