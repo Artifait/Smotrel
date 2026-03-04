@@ -76,12 +76,18 @@
 
     </UserControl.Resources>
 
-    <Grid x:Name="RootGrid" ClipToBounds="True">
+    <Grid x:Name="RootGrid"
+          Focusable="True"
+          ClipToBounds="True"
+          MouseEnter="RootGrid_MouseEnter"
+          MouseLeave="RootGrid_MouseLeave"
+          MouseMove="RootGrid_MouseMove"
+          MouseLeftButtonDown="RootGrid_MouseLeftButtonDown">
 
         <!-- ── СЛОЙ 1: Видео ──────────────────────────────────────────────── -->
         <MediaElement x:Name="Media"
-                      LoadedBehavior="Manual" UnloadedBehavior="Stop"
-                      Stretch="Uniform" ScrubbingEnabled="True"
+                      LoadedBehavior="Manual"
+                      UnloadedBehavior="Stop"
                       MediaOpened="Media_MediaOpened"
                       MediaEnded="Media_MediaEnded"
                       MediaFailed="Media_MediaFailed"/>

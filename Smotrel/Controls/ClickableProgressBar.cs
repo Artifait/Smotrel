@@ -330,7 +330,7 @@ namespace Smotrel.Controls
 
             if (Timecodes != null && Duration > TimeSpan.Zero)
             {
-                var markerPen = new Pen(new SolidColorBrush(Color.FromArgb(180, 220, 220, 220)), 2);
+                var markerPen = new Pen(new SolidColorBrush(Color.FromArgb(180, 220, 220, 220)), 6);
 
                 foreach (var tc in Timecodes)
                 {

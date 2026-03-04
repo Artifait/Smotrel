@@ -112,9 +112,7 @@
                         PlaybackStateChanged="Player_PlaybackStateChanged"
                         PlaybackEnded="Player_PlaybackEnded"
                         PreviousRequested="Player_PreviousRequested"
-                        NextRequested="Player_NextRequested"
-                        VolumeChangedRouted="Player_VolumeChanged"
-                        VideoWindowStateChanged="Player_WindowStateChanged"/>
+                        NextRequested="Player_NextRequested"/>
 
                     <!-- Разделитель -->
                     <GridSplitter Grid.Column="1" Width="4"
@@ -143,15 +141,12 @@
             <Grid x:Name="FullscreenLayout" Visibility="Collapsed">
                 <ctrls:SmotrelPlayer
                     x:Name="PlayerFullscreen"
-                    PlayerMode="Fullscreen"
                     IsLocked="True"
                     OverlayTimeout="00:00:03"
                     PlaybackStateChanged="Player_PlaybackStateChanged"
                     PlaybackEnded="Player_PlaybackEnded"
                     PreviousRequested="Player_PreviousRequested"
-                    NextRequested="Player_NextRequested"
-                    VolumeChangedRouted="Player_VolumeChanged"
-                    VideoWindowStateChanged="Player_WindowStateChanged"/>
+                    NextRequested="Player_NextRequested"/>
             </Grid>
 
         </Grid>

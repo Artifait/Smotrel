@@ -2,29 +2,34 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctrls="clr-namespace:Smotrel.Controls"
-        Title="PiP"
-        Width="840" Height="480"
-        MinWidth="240" MinHeight="135"
+        Title="Smotrel — Picture in Picture"
+        Width="480" Height="270"
+        MinWidth="280" MinHeight="160"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
-        ShowInTaskbar="False"
-        Closing="PipWindow_Closing">
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        MouseMove="Window_MouseMove"
+        MouseLeftButtonUp="Window_MouseLeftButtonUp">
 
     <!--
-        AllowsTransparency=True + CornerRadius на Border дают скруглённые углы.
-        DragMove на MouseLeftButtonDown позволяет тащить окно.
+        The Border provides a rounded, outlined frame around the player.
+        ClipToBounds on the inner SmotrelPlayer handles the video clipping.
     -->
     <Border Background="Black"
-            BorderBrush="#44FFFFFF"
-            BorderThickness="1"
             CornerRadius="8"
-            ClipToBounds="True"
-            MouseLeftButtonDown="Border_MouseLeftButtonDown">
+            BorderBrush="#44FFFFFF"
+            BorderThickness="1">
 
-        <ctrls:SmotrelPlayer x:Name="Player"
-                             PlayerMode="PiP"/>
+        <ctrls:SmotrelPlayer
+            x:Name="PipPlayer"
+            PlaybackEnded="PipPlayer_PlaybackEnded"
+            PreviousRequested="PipPlayer_PreviousRequested"
+            NextRequested="PipPlayer_NextRequested"
+            ExitModeRequested="PipPlayer_ExitModeRequested"/>
 
     </Border>
 </Window>

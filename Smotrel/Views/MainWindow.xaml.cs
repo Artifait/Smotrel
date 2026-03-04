@@ -166,7 +166,7 @@ namespace Smotrel.Views
 
                 if (course == null) return;
 
-                new MainPlayer(course).Show();
+                new MainPlayer(course, Context).Show();
                 Close();
             }
             finally

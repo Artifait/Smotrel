@@ -1,162 +1,156 @@
-﻿// ════════════════════════════════════════════════════════════════════════════════
-//  MainPlayer.xaml.cs  —  оркестратор режимов Normal / Fullscreen / PiP
-// ════════════════════════════════════════════════════════════════════════════════
-//
-//  АРХИТЕКТУРА ПЛЕЕРОВ
-//  ───────────────────
-//
-//  MainPlayer управляет тремя экземплярами SmotrelPlayer:
-//
-//    PlayerNormal     — всегда в дереве XAML (NormalLayout)
-//    PlayerFullscreen — всегда в дереве XAML (FullscreenLayout), Collapsed когда не нужен
-//    _pipPlayer       — создаётся/уничтожается вместе с PipPlayerWindow
-//
-//  _activePlayer — вычисляемое свойство, указывает на плеер текущего режима.
-//  Все команды (LoadVideo, SeekTo, горячие клавиши) идут через _activePlayer.
-//
-//  ИНВАРИАНТЫ (всегда выполняются):
-//    • Ровно один плеер НЕ заблокирован (IsLocked=false) — это _activePlayer
-//    • Остальные плееры заблокированы (IsLocked=true) и на паузе
-//    • PlayerState "активного" плеера отражает намерение пользователя
-//
-// ════════════════════════════════════════════════════════════════════════════════
-//
-//  ПЕРЕХОД МЕЖДУ РЕЖИМАМИ — общая схема
-//  ─────────────────────────────────────
-//
-//  Каждый SwitchTo* следует этому порядку:
-//
-//    1. СНЭПШОТ — читаем из _activePlayer: position, isPlaying, volume
-//       (делаем это ПЕРВЫМ, до любых изменений состояния)
-//
-//    2. ЗАМОРОЗКА старого плеера:
-//         IsLocked = true    →  Media.Pause() напрямую, таймер стоп
-//         PlayerState = Paused  (чтобы при разблокировке не стартовал сам)
-//
-//    3. ПОДГОТОВКА нового плеера:
-//         LoadVideo(currentVideo, timecodes, position)  — только источник
-//         Volume = снэпшот.volume
-//         PlayerState = снэпшот.isPlaying ? Playing : Paused
-//              → OnPlayerStateChanged сохраняет намерение
-//         IsLocked = false
-//              → OnIsLockedChanged: если _isMediaReady && PlayerState==Playing → Play()
-//              → если ещё не готов → MediaOpened применит PlayerState
-//
-//    4. ПЕРЕКЛЮЧЕНИЕ Layout / Window
-//
-// ════════════════════════════════════════════════════════════════════════════════
-//
-//  СОБЫТИЯ от SmotrelPlayer (все Bubble)
-//  ──────────────────────────────────────
-//
-//    PlaybackStateChanged    — поднимается при изменении PlayerState (Play/Pause)
-//                              MainPlayer: обновляет Nav позицию
-//                              НЕ поднимается во время скраббинга (см. SmotrelPlayer)
-//
-//    PlaybackEnded           — поднимается в Media_MediaEnded (после смены PlayerState→Paused)
-//                              MainPlayer: загружает следующее видео или блокирует плеер
-//
-//    PreviousRequested       — кнопка "Назад" или Shift+Left
-//    NextRequested           — кнопка "Вперёд" или Shift+Right
-//                              MainPlayer: LoadVideoIntoActive(prev/next)
-//
-//    VideoWindowStateChanged — кнопки Fullscreen/PiP/ExitMode или клавиши F/P/Esc
-//                              MainPlayer: SwitchTo*(...)
-//
-//    VolumeChangedRouted     — изменение громкости (пока не используется для синхронизации)
-//
-// ════════════════════════════════════════════════════════════════════════════════
-
-using Smotrel.Controls;
+﻿using Smotrel.Controls;
+using Smotrel.DialogWindows;
 using Smotrel.Enums;
 using Smotrel.Interfaces;
 using Smotrel.Models;
-using Smotrel.Services;
-using Smotrel.Settings;
+using Smotrel.Services;     
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Threading;
+using System.Windows.Media;
+using System.Xml.Linq;
 
 namespace Smotrel.Views
 {
     public partial class MainPlayer : Window
     {
-        // ── Данные курса ──────────────────────────────────────────────────────
+        // ── Fields ──────────────────────────────────────────────────────────
+        private readonly PlayerSnapshot? _initialSnapshot;
 
-        public CourseModel Course { get; }
+        private readonly CourseModel _course;
+        private readonly SmotrelContext _db;
+        private readonly LastPositionService _lastPosSvc;
 
-        private VideoModel? _currentVideo = null;
-        private IList<ITimecode> _currentTimecodes = [];
-
-        // ── Режим и активный плеер ────────────────────────────────────────────
-
-        private PlayerMode _currentMode = PlayerMode.Normal;
-
-        /// <summary>
-        /// Возвращает активный плеер для текущего режима.
-        /// Гарантировано не null — при PiP без _pipPlayer падбэк на PlayerNormal.
-        /// </summary>
-        private SmotrelPlayer ActivePlayer => _currentMode switch
-        {
-            PlayerMode.Fullscreen => PlayerFullscreen,
-            PlayerMode.PiP => _pipPlayer ?? PlayerNormal,
-            _ => PlayerNormal,
-        };
-
-        // ── PiP ──────────────────────────────────────────────────────────────
-
+        private VideoModel? _currentVideo;
+        private bool _isFullscreen;
         private PipPlayerWindow? _pipWindow;
-        private SmotrelPlayer? _pipPlayer;
 
-        // ── Сервисы ───────────────────────────────────────────────────────────
+        /// <summary>The player that should receive hotkeys at any given moment.</summary>
+        private SmotrelPlayer ActivePlayer =>
+            _isFullscreen ? PlayerFullscreen : PlayerNormal;
 
-        private readonly DispatcherTimer _navUpdateTimer = new()
-        { Interval = TimeSpan.FromMilliseconds(500) };
+        // ═══════════════════════════════════════════════════════════════════
+        //  Constructor
+        // ═══════════════════════════════════════════════════════════════════
 
-        private LastPositionService? _positionSaver;
-
-        // ── Конструктор ───────────────────────────────────────────────────────
-
-        public MainPlayer(CourseModel course)
+        public MainPlayer(CourseModel course, SmotrelContext db, PlayerSnapshot? snapshot = null)
         {
             InitializeComponent();
 
-            Course = course;
-            GapTitle.Text = "Smotrel — " + Course.Label;
+            _initialSnapshot = snapshot;
+            _course = course;
+            _db = db;
 
-            Loaded += OnWindowStateChanged;
-            Loaded += OnLoaded;
+            GapTitle.Text = course.Label;
 
-            _navUpdateTimer.Tick += (_, _) => Nav.UpdatePosition(ActivePlayer.CurrentTime);
-            _navUpdateTimer.Start();
+            // ── Configure each player ──────────────────────────────────────
+            PlayerNormal.SetMode(PlayerMode.Normal);
+
+            // PlayerFullscreen starts locked (set in XAML); just set the mode
+            PlayerFullscreen.SetMode(PlayerMode.Fullscreen);
+
+            // ── Wire player events ─────────────────────────────────────────
+            WireCommonPlayerEvents(PlayerNormal);
+            WireCommonPlayerEvents(PlayerFullscreen);
+
+            // Mode-specific events
+            PlayerNormal.PipRequested += PlayerNormal_PipRequested;
+            PlayerNormal.FullscreenRequested += PlayerNormal_FullscreenRequested;
+            PlayerFullscreen.ExitModeRequested += PlayerFullscreen_ExitModeRequested;
+
+            // ── Nav → Player position sync ─────────────────────────────────
+            PlayerNormal.PositionChanged += (_, pos) =>
+            {
+                if (!_isFullscreen) Nav.UpdatePosition(pos);
+            };
+            PlayerFullscreen.PositionChanged += (_, pos) =>
+            {
+                if (_isFullscreen) Nav.UpdatePosition(pos);
+            };
+
+            // ── Course navigation control ──────────────────────────────────
+            Nav.Initialize(course, db);
+
+            // ── Last-position persistence service ─────────────────────────
+            _lastPosSvc = new LastPositionService(db);
+            _lastPosSvc.Start(() => (_course, _currentVideo, ActivePlayer.CaptureState().StartPos));
+
+            // ── Load the first video after the window is shown ─────────────
+            VideoModel? startVideo = null;
+            if (_initialSnapshot != null)
+            {
+                startVideo = _initialSnapshot.Video;
+            } else {
+                var firstVideo = course.GetVideoByAbsoluteIndex(0);
+                startVideo = course.LastVideo ?? firstVideo;
+            }
+
+            Loaded += async (_, _) => await LoadVideoWithResumeAsync(startVideo!, true);
         }
 
-        // ── Инициализация ─────────────────────────────────────────────────────
-
-        private void OnLoaded(object sender, EventArgs e)
+        // ── Wire helper ───────────────────────────────────────────────────
+        private void WireCommonPlayerEvents(SmotrelPlayer player)
         {
-            var firstVideo = Course.GetVideoByAbsoluteIndex(0);
-            _currentVideo = FindResumeVideo(Course.MainChapter) ?? firstVideo;
-
-            Nav.Initialize(Course, MainWindow.Context);
-
-            if (_currentVideo != null)
-                LoadVideoIntoActive(_currentVideo, restorePosition: true);
-
-            _positionSaver = new LastPositionService(MainWindow.Context);
-            _positionSaver.Start(() => (_currentVideo, ActivePlayer.CurrentTime));
+            player.PlaybackEnded += Player_PlaybackEnded;
+            player.PreviousRequested += Player_PreviousRequested;
+            player.NextRequested += Player_NextRequested;
         }
 
-        protected override async void OnClosing(CancelEventArgs e)
+        // ═══════════════════════════════════════════════════════════════════
+        //  Video Loading with Resume Dialog
+        // ═══════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Loads <paramref name="video"/> into the active player.
+        /// Shows the resume dialog when the video has a saved position.
+        /// </summary>
+        private async Task LoadVideoWithResumeAsync(VideoModel video, bool showResumeDialog = false)
         {
-            base.OnClosing(e);
-            if (_positionSaver != null)
-                await _positionSaver.FlushAndStop();
-        }
+            OnWindowStateChanged(null, null);
+            _currentVideo = video;
+            Nav.SetCurrentVideo(video);
 
-        // ── Поиск видео для продолжения ───────────────────────────────────────
+            TimeSpan startPos = TimeSpan.Zero;
+            if(_initialSnapshot != null)
+            {
+                ActivePlayer.LoadState(_initialSnapshot);
+                await Task.CompletedTask;
+                return;
+            }
+            else
+            {
+                // Show resume dialog only when there's a meaningful saved position
+                if (video.LastPosition > TimeSpan.FromSeconds(2) && showResumeDialog)
+                {
+                    var dlg = new ResumeDialog(video.Title, video.LastPosition)
+                    {
+                        Owner = this
+                    };
+                    dlg.ShowDialog();
+                    if (dlg.ShouldResume)
+                        startPos = video.LastPosition;
+                }
+            }
+            
+            // Inherit current volume / speed from whichever player is active so the
+            // transition feels seamless when switching videos.
+            var current = ActivePlayer.CaptureState();
+
+            var snap = new PlayerSnapshot
+            {
+                Video = video,
+                StartPos = startPos,
+                Volume = current.Video != null ? current.Volume : 1.0,
+                Speed = current.Video != null ? current.Speed : 1.0,
+                State = PlayerState.Playing,
+                Timecodes = video.Timestamps.Cast<ITimecode>().ToList()
+            };
+
+            ActivePlayer.LoadState(snap);
+            
+            await Task.CompletedTask; // keeps the method async for future awaits
+        }
 
         private static VideoModel? FindResumeVideo(ChapterCourseModel chapter)
         {
@@ -173,331 +167,11 @@ namespace Smotrel.Views
             return null;
         }
 
-        // ════════════════════════════════════════════════════════════════════════
-        //  ЗАГРУЗКА ВИДЕО
-        // ════════════════════════════════════════════════════════════════════════
-
-        /// <summary>
-        /// Загружает видео в активный плеер.
-        /// Не меняет режим окна — используй SwitchTo* для этого.
-        /// </summary>
-        private void LoadVideoIntoActive(VideoModel video, bool restorePosition = false)
-        {
-            _currentVideo = video;
-            _currentTimecodes = BuildTimecodes(video);
-
-            var startPos = restorePosition && video.LastPosition > TimeSpan.Zero
-                ? video.LastPosition
-                : TimeSpan.Zero;
-
-            // PlayerState у ActivePlayer уже содержит намерение (Playing/Paused).
-            // LoadVideo только устанавливает источник; воспроизведение запустит MediaOpened.
-            ActivePlayer.LoadVideo(video, _currentTimecodes, startPos);
-            Nav?.SetCurrentVideo(video);
-        }
-
-        private static IList<ITimecode> BuildTimecodes(VideoModel video)
-        {
-            if (video.Timestamps.Count > 0)
-                return video.Timestamps.Cast<ITimecode>().ToList();
-
-            if (video.Duration == TimeSpan.Zero)
-                return [];
-
-            return Enumerable.Range(1, 4)
-                .Select(i => VideoTimecode.Create(
-                    TimeSpan.FromSeconds(video.Duration.TotalSeconds * i * 0.2),
-                    $"Часть {i}"))
-                .Cast<ITimecode>()
-                .ToList();
-        }
-
-        // ════════════════════════════════════════════════════════════════════════
-        //  ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ
-        // ════════════════════════════════════════════════════════════════════════
-
-        // ── Снэпшот состояния ─────────────────────────────────────────────────
-
-        /// <summary>
-        /// Снимает снэпшот с активного плеера перед переключением режима.
-        /// Вызывается ПЕРВЫМ делом в каждом SwitchTo*, до любых изменений.
-        /// </summary>
-        private (TimeSpan position, bool isPlaying, double volume) SnapshotActivePlayer()
-            => (
-                position: ActivePlayer.CurrentTime,
-                isPlaying: ActivePlayer.PlayerState == PlayerState.Playing,
-                volume: ActivePlayer.Volume
-            );
-
-        /// <summary>
-        /// Замораживает плеер: останавливает воспроизведение и блокирует UI.
-        /// Вызывается для "донора" при каждом переключении режима.
-        /// </summary>
-        private static void FreezePlayer(SmotrelPlayer player, string? lockMessage = null)
-        {
-            // Сначала меняем PlayerState — это остановит таймер и Media корректно
-            player.PlayerState = PlayerState.Paused;
-            player.IsLocked = true;
-
-            if (lockMessage != null)
-                player.LockMessage = lockMessage;
-        }
-
-        /// <summary>
-        /// Применяет снэпшот к плееру-получателю: загружает видео, восстанавливает позицию и Volume.
-        /// PlayerState задаётся снаружи (после этого метода) чтобы сохранить явность потока.
-        /// </summary>
-        private void ApplySnapshotToPlayer(SmotrelPlayer player,
-            TimeSpan position, double volume)
-        {
-            if (_currentVideo == null) return;
-
-            player.Volume = volume;
-
-            // Разблокируем ДО LoadVideo — иначе MediaOpened не запустит Play даже если PlayerState==Playing
-            player.IsLocked = false;
-
-            player.LoadVideo(_currentVideo, _currentTimecodes, position);
-        }
-
-        // ── Normal ────────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Переход в Normal режим из Fullscreen или PiP.
-        ///
-        /// Последовательность событий после вызова:
-        ///   1. FreezePlayer(_activePlayer) → PlayerState=Paused, IsLocked=true, Media.Pause()
-        ///   2. _currentMode = Normal
-        ///   3. ApplySnapshotToPlayer(PlayerNormal) → IsLocked=false, LoadVideo
-        ///   4. PlayerNormal.PlayerState = Paused/Playing (из снэпшота)
-        ///      → если _isMediaReady: Media.Play/Pause сразу
-        ///      → если не готов: MediaOpened применит состояние
-        ///   5. Layout переключается
-        /// </summary>
-        private void SwitchToNormal()
-        {
-            if (_currentMode == PlayerMode.Normal) return;
-
-            // 1. Снэпшот — читаем ДО любых изменений
-            var (position, isPlaying, volume) = SnapshotActivePlayer();
-            var prevMode = _currentMode;
-
-            // 2. Заморозка источника
-            FreezePlayer(ActivePlayer);
-
-            // 3. Закрываем PiP-окно (если был PiP)
-            if (prevMode == PlayerMode.PiP && _pipWindow != null)
-            {
-                UnsubscribePipPlayer();
-                _pipWindow.ForceClose();
-                _pipWindow = null;
-                _pipPlayer = null;
-            }
-
-            // 4. Скрываем Fullscreen layout (если был Fullscreen)
-            if (prevMode == PlayerMode.Fullscreen)
-            {
-                FullscreenLayout.Visibility = Visibility.Collapsed;
-                NormalLayout.Visibility = Visibility.Visible;
-            }
-
-            // 5. Переключаем режим
-            _currentMode = PlayerMode.Normal;
-
-            // 6. Готовим PlayerNormal
-            PlayerNormal.LockMessage = "Контент недоступен"; // сброс сообщения
-            PlayerNormal.PlayerMode = PlayerMode.Normal;
-            PlayerNormal.PlayerState = isPlaying ? PlayerState.Playing : PlayerState.Paused;
-
-            ApplySnapshotToPlayer(PlayerNormal, position, volume);
-            // ApplySnapshotToPlayer разблокирует PlayerNormal и вызовет LoadVideo.
-            // MediaOpened запустит/остановит воспроизведение согласно PlayerState.
-        }
-
-        // ── Fullscreen ────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Переход в Fullscreen режим.
-        ///
-        /// Последовательность событий:
-        ///   1. Снэпшот с PlayerNormal (или PiP если переход из PiP — не поддерживается напрямую)
-        ///   2. FreezePlayer(PlayerNormal) → PlayerState=Paused, IsLocked=true
-        ///   3. PlayerFullscreen: PlayerState=снэпшот, ApplySnapshot
-        ///      → MediaOpened стартует воспроизведение
-        ///   4. Layout: NormalLayout=Collapsed, FullscreenLayout=Visible
-        /// </summary>
-        private void SwitchToFullscreen()
-        {
-            if (_currentMode == PlayerMode.Fullscreen) return;
-
-            // 1. Снэпшот
-            var (position, isPlaying, volume) = SnapshotActivePlayer();
-
-            // 2. Заморозка источника
-            FreezePlayer(ActivePlayer);
-
-            // 3. Переключаем режим
-            _currentMode = PlayerMode.Fullscreen;
-
-            // 4. Готовим PlayerFullscreen
-            PlayerFullscreen.PlayerMode = PlayerMode.Fullscreen;
-            PlayerFullscreen.PlayerState = isPlaying ? PlayerState.Playing : PlayerState.Paused;
-
-            ApplySnapshotToPlayer(PlayerFullscreen, position, volume);
-
-            // 5. Layout
-            NormalLayout.Visibility = Visibility.Collapsed;
-            FullscreenLayout.Visibility = Visibility.Visible;
-        }
-
-        // ── PiP ──────────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Переход в PiP режим.
-        ///
-        /// Последовательность событий:
-        ///   1. Снэпшот с PlayerNormal
-        ///   2. FreezePlayer(PlayerNormal) + сообщение о PiP
-        ///   3. Создаём PipPlayerWindow + _pipPlayer
-        ///   4. Подписываемся на события _pipPlayer
-        ///   5. _pipPlayer: PlayerState=снэпшот, ApplySnapshot
-        ///      → MediaOpened стартует воспроизведение
-        ///   6. pipWindow.Show()
-        /// </summary>
-        private void SwitchToPiP()
-        {
-            if (_currentMode == PlayerMode.PiP) return;
-
-            // 1. Снэпшот
-            var (position, isPlaying, volume) = SnapshotActivePlayer();
-
-            // 2. Заморозка PlayerNormal
-            FreezePlayer(PlayerNormal, lockMessage: "Воспроизводится\nв Picture-in-Picture");
-
-            // 3. Создаём PiP окно
-            _pipWindow = new PipPlayerWindow(this);
-            _pipPlayer = _pipWindow.Player;
-
-            // 4. Подписка на события
-            SubscribePipPlayer();
-
-            // 5. Переключаем режим
-            _currentMode = PlayerMode.PiP;
-
-            // 6. Готовим _pipPlayer
-            _pipPlayer.PlayerMode = PlayerMode.PiP;
-            _pipPlayer.OverlayTimeout = PlayerNormal.OverlayTimeout;
-            _pipPlayer.PlayerState = isPlaying ? PlayerState.Playing : PlayerState.Paused;
-
-            ApplySnapshotToPlayer(_pipPlayer, position, volume);
-
-            // 7. Показываем окно
-            _pipWindow.Show();
-        }
-
-        // ── Управление подпиской PiP ──────────────────────────────────────────
-
-        private void SubscribePipPlayer()
-        {
-            if (_pipPlayer == null) return;
-
-            _pipPlayer.PlaybackStateChanged += Player_PlaybackStateChanged;
-            _pipPlayer.PlaybackEnded += Player_PlaybackEnded;
-            _pipPlayer.PreviousRequested += Player_PreviousRequested;
-            _pipPlayer.NextRequested += Player_NextRequested;
-            _pipPlayer.VolumeChangedRouted += Player_VolumeChanged;
-            _pipPlayer.VideoWindowStateChanged += Player_WindowStateChanged;
-        }
-
-        private void UnsubscribePipPlayer()
-        {
-            if (_pipPlayer == null) return;
-
-            _pipPlayer.PlaybackStateChanged -= Player_PlaybackStateChanged;
-            _pipPlayer.PlaybackEnded -= Player_PlaybackEnded;
-            _pipPlayer.PreviousRequested -= Player_PreviousRequested;
-            _pipPlayer.NextRequested -= Player_NextRequested;
-            _pipPlayer.VolumeChangedRouted -= Player_VolumeChanged;
-            _pipPlayer.VideoWindowStateChanged -= Player_WindowStateChanged;
-        }
-
-        // ════════════════════════════════════════════════════════════════════════
-        //  СОБЫТИЯ SmotrelPlayer
-        // ════════════════════════════════════════════════════════════════════════
-        //
-        //  PlayerNormal и PlayerFullscreen подписаны через XAML (Bubble-события).
-        //  _pipPlayer подписывается/отписывается в SubscribePipPlayer/Unsubscribe.
-
-        /// <summary>
-        /// Вызывается при любом Play/Pause.
-        /// НЕ вызывается во время скраббинга (см. SmotrelPlayer).
-        /// </summary>
-        private void Player_PlaybackStateChanged(object sender, RoutedEventArgs e)
-        {
-            Nav.UpdatePosition(ActivePlayer.CurrentTime);
-        }
-
-        /// <summary>
-        /// Вызывается после Media_MediaEnded (PlayerState уже == Paused к этому моменту).
-        /// Загружает следующее видео или завершает курс.
-        /// </summary>
-        private void Player_PlaybackEnded(object sender, RoutedEventArgs e)
-        {
-            if (_currentVideo == null) return;
-
-            var next = Course.GetNextVideo(_currentVideo);
-            if (next != null)
-            {
-                // LoadVideoIntoActive не меняет PlayerState — плеер начнёт с Paused
-                // (из Media_MediaEnded). Хотим автоплей → выставляем явно.
-                ActivePlayer.PlayerState = PlayerState.Playing;
-                LoadVideoIntoActive(next);
-            }
-            else
-            {
-                ActivePlayer.IsLocked = true;
-                ActivePlayer.LockMessage = "Курс завершён";
-            }
-        }
-
-        private void Player_PreviousRequested(object sender, RoutedEventArgs e)
-        {
-            if (_currentVideo == null) return;
-            var prev = Course.GetPreviousVideo(_currentVideo);
-            if (prev != null) LoadVideoIntoActive(prev);
-        }
-
-        private void Player_NextRequested(object sender, RoutedEventArgs e)
-        {
-            if (_currentVideo == null) return;
-            var next = Course.GetNextVideo(_currentVideo);
-            if (next != null) LoadVideoIntoActive(next);
-        }
-
-        private void Player_VolumeChanged(object sender, RoutedEventArgs e) { /* зарезервировано */ }
-
-        private void Player_WindowStateChanged(object sender, RoutedEventArgs e)
-        {
-            if (e is not VideoWindowStateRequestEventArgs req) return;
-
-            switch (req.Request)
-            {
-                case VideoWindowStateRequest.Normal:
-                    SwitchToNormal();
-                    break;
-                case VideoWindowStateRequest.Fullscreen:
-                    SwitchToFullscreen();
-                    break;
-                case VideoWindowStateRequest.PiP:
-                    SwitchToPiP();
-                    break;
-            }
-        }
-
-        // ── Навигация ─────────────────────────────────────────────────────────
-
+        // ═══════════════════════════════════════════════════════════════════
+        //  XAML Event Handlers — CourseNavigationControl
+        // ═══════════════════════════════════════════════════════════════════
         private void Nav_VideoRequested(VideoModel video)
-            => LoadVideoIntoActive(video);
+            => _ = LoadVideoWithResumeAsync(video);
 
         private void Nav_SeekRequested(TimeSpan pos)
             => ActivePlayer.SeekTo(pos);
@@ -506,69 +180,209 @@ namespace Smotrel.Views
         {
             if (_currentVideo?.Id == video.Id)
             {
-                var timecodes = BuildTimecodes(video);
-                ActivePlayer.Timeline.Timecodes = timecodes;
+                ActivePlayer.Timeline.Timecodes = video.Timestamps.Cast<ITimecode>().ToList();
             }
         }
 
-        // ════════════════════════════════════════════════════════════════════════
-        //  PiP: обратный вызов от PipPlayerWindow
-        // ════════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════
+        //  XAML Event Handlers — SmotrelPlayer (both)
+        // ═══════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Вызывается PipPlayerWindow когда пользователь закрыл PiP вручную.
-        /// Используем Dispatcher.BeginInvoke чтобы не вызывать SwitchToNormal
-        /// в середине обработчика Closing.
-        /// </summary>
-        public void OnPipWindowClosedByUser()
+        private void Player_PlaybackStateChanged(object? sender, PlayerState state)
         {
-            Dispatcher.BeginInvoke(() => SwitchToNormal());
+            // Nothing to update in the MainPlayer UI at the moment.
+            // Could update a taskbar overlay icon here if desired.
         }
 
-        // ════════════════════════════════════════════════════════════════════════
-        //  ГОРЯЧИЕ КЛАВИШИ
-        // ════════════════════════════════════════════════════════════════════════
+        private void Player_PlaybackEnded(object? sender, EventArgs e)
+        {
+            if (_currentVideo == null) return;
+            var next = _course.GetNextVideo(_currentVideo);
+            if (next != null) _ = LoadVideoWithResumeAsync(next);
+        }
+
+        private void Player_PreviousRequested(object? sender, EventArgs e)
+        {
+            if (_currentVideo == null) return;
+            var prev = _course.GetPreviousVideo(_currentVideo);
+            if (prev != null) _ = LoadVideoWithResumeAsync(prev);
+        }
+
+        private void Player_NextRequested(object? sender, EventArgs e)
+        {
+            if (_currentVideo == null) return;
+            var next = _course.GetNextVideo(_currentVideo);
+            if (next != null) _ = LoadVideoWithResumeAsync(next);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  Picture-in-Picture
+        // ═══════════════════════════════════════════════════════════════════
+
+        private void PlayerNormal_PipRequested(object? sender, EventArgs e)
+        {
+            // ① Capture the full state BEFORE locking (so State = Playing is preserved)
+            var snap = PlayerNormal.CaptureState();
+
+            // ② Lock PlayerNormal — pauses media and shows overlay
+            PlayerNormal.LockWithMessage("Playing in Picture-in-Picture");
+
+            // ③ Open PiP window — it owns the snapshot and handles its player
+            _pipWindow = new PipPlayerWindow(this, this._course, snap, _db);
+            _pipWindow.Closed += PipWindow_Closed;
+            _pipWindow.Show();
+        }
+
+        /// <summary>
+        /// Called by <see cref="PipPlayerWindow"/> when the user explicitly returns
+        /// to normal mode (via the exit-mode button inside PiP).
+        /// </summary>
+        public void ReturnFromPip(PlayerSnapshot snap)
+        {
+            _pipWindow = null;
+            PlayerNormal.UnlockPlayer();
+            PlayerNormal.LoadState(snap); // full state restore — IMPORTANT (2)
+        }
+
+        private void PipWindow_Closed(object? sender, EventArgs e)
+        {
+            // Window was closed without calling ReturnFromPip (e.g. Alt+F4, OS close)
+            if (_pipWindow != null && PlayerNormal.IsLocked)
+            {
+                _pipWindow = null;
+                PlayerNormal.UnlockPlayer();
+
+                // Resume at the last known position in a paused state
+                if (_currentVideo != null)
+                    PlayerNormal.LoadState(PlayerSnapshot.Default(_currentVideo) with
+                    {
+                        State = PlayerState.Paused
+                    });
+            }
+            _pipWindow = null;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  Fullscreen
+        // ═══════════════════════════════════════════════════════════════════
+        private bool IsInFullscreenMode = false;
+        private void PlayerNormal_FullscreenRequested(object? sender, EventArgs e)
+        {
+            //if(!IsInFullscreenMode)
+            //{
+            //    Grid oldParent = (VisualTreeHelper.GetParent(PlayerNormal) as Grid)!;
+            //    oldParent.Children.Remove(PlayerNormal);
+
+            //    FullscreenLayout.Children.Add(PlayerNormal);
+            //    NormalLayout.Visibility = Visibility.Collapsed;
+            //    FullscreenLayout.Visibility = Visibility.Visible;
+            //    IsInFullscreenMode = true;
+            //}
+            //else
+            //{
+            //    Grid oldParent = (VisualTreeHelper.GetParent(PlayerNormal) as Grid)!;
+            //    oldParent.Children.Remove(PlayerNormal);
+
+            //    NormalLayout.Children.Add(PlayerNormal);
+            //    FullscreenLayout.Visibility = Visibility.Collapsed;
+            //    NormalLayout.Visibility = Visibility.Visible;
+            //    IsInFullscreenMode = false;
+            //}
+
+
+            // ① Capture state from Normal BEFORE locking — IMPORTANT (2)
+            var snap = PlayerNormal.CaptureState();
+
+            // ② Lock Normal player
+            PlayerNormal.LockWithMessage("Playing in Fullscreen");
+
+            // ③ Unlock and configure the Fullscreen player with captured state
+            PlayerFullscreen.UnlockPlayer();
+            PlayerFullscreen.LoadState(snap);
+
+            // ④ Switch layouts
+            NormalLayout.Visibility = Visibility.Collapsed;
+            FullscreenLayout.Visibility = Visibility.Visible;
+            _isFullscreen = true;
+
+            WindowState = WindowState.Maximized;
+        }
+
+        private void PlayerFullscreen_ExitModeRequested(object? sender, EventArgs e)
+            => ExitFullscreen();
+
+        private void ExitFullscreen()
+        {
+            // ① Capture state from Fullscreen player — IMPORTANT (2)
+            var snap = PlayerFullscreen.CaptureState();
+
+            // ② Lock Fullscreen player (hides it after layout swap)
+            PlayerFullscreen.LockWithMessage(string.Empty);
+
+            // ③ Restore Normal player from captured state
+            PlayerNormal.UnlockPlayer();
+            PlayerNormal.LoadState(snap);
+
+            // ④ Switch layouts
+            FullscreenLayout.Visibility = Visibility.Collapsed;
+            NormalLayout.Visibility = Visibility.Visible;
+            _isFullscreen = false;
+
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  Keyboard Hotkeys
+        // ═══════════════════════════════════════════════════════════════════
 
         private void MainPlayer_KeyDown(object sender, KeyEventArgs e)
         {
+            // Do not forward hotkeys when PiP is active — PiP has its own focus
+            if (_pipWindow != null && !_isFullscreen) return;
+
             if (Keyboard.FocusedElement is TextBox or TextBlock) return;
 
-            if (ActivePlayer.HandleHotkey(e.Key, Keyboard.Modifiers))
-                e.Handled = true;
+            var hotkey = BuildHotkeyString(e.Key, Keyboard.Modifiers);
+            ActivePlayer.HandleHotkey(hotkey);
+            e.Handled = true;
         }
 
-        // ════════════════════════════════════════════════════════════════════════
-        //  КНОПКИ ЗАГОЛОВКА
-        // ════════════════════════════════════════════════════════════════════════
-
-        private void BackButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Converts a WPF <see cref="Key"/> + <see cref="ModifierKeys"/> combo
+        /// into the same string format stored in <see cref="AppSettings"/>
+        /// (e.g. "Space", "Shift+Right", "Ctrl+F").
+        /// </summary>
+        private static string BuildHotkeyString(Key key, ModifierKeys mods)
         {
-            _pipWindow?.ForceClose();
-            new MainWindow().Show();
-            Close();
+            var sb = new System.Text.StringBuilder();
+            if (mods.HasFlag(ModifierKeys.Control)) sb.Append("Ctrl+");
+            if (mods.HasFlag(ModifierKeys.Shift)) sb.Append("Shift+");
+            if (mods.HasFlag(ModifierKeys.Alt)) sb.Append("Alt+");
+            sb.Append(key.ToString());
+            return sb.ToString();
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-            => WindowState = WindowState.Minimized;
-
-        private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
-            => WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal : WindowState.Maximized;
-
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            _pipWindow?.ForceClose();
-            Close();
-            Application.Current.Shutdown();
-        }
+        // ═══════════════════════════════════════════════════════════════════
+        //  Window Chrome Events
+        // ═══════════════════════════════════════════════════════════════════
 
         private void Header_Down(object sender, MouseButtonEventArgs e)
         {
             if (e.LeftButton == MouseButtonState.Pressed) DragMove();
         }
 
-        // ── Maximized / Normal подстройка ─────────────────────────────────────
+        private void BackButton_Click(object sender, RoutedEventArgs e) => Close();
+        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
+        private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
+            => WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+
+        /// <summary>
+        /// Compensates for WPF maximized-window overscan (adds a small top gap so
+        /// the window doesn't bleed under the taskbar).
+        /// </summary>
         private void OnWindowStateChanged(object sender, EventArgs e)
         {
             var tmplExit = ExitBtn.Template;
@@ -593,6 +407,23 @@ namespace Smotrel.Views
                 if (borderExit != null) borderExit.CornerRadius = new CornerRadius(0, 10, 0, 0);
                 if (borderBack != null) borderBack.CornerRadius = new CornerRadius(10, 0, 0, 0);
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  Shutdown
+        // ═══════════════════════════════════════════════════════════════════
+
+        protected override async void OnClosing(CancelEventArgs e)
+        {
+            base.OnClosing(e);
+
+            // Gracefully close PiP without the ReturnFromPip path
+            _pipWindow?.Close();
+
+            new MainWindow().Show();
+            // Flush the last known position to the database before we exit
+            await _lastPosSvc.FlushAndStop();
+
         }
     }
 }

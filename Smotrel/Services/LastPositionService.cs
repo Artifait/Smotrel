@@ -20,7 +20,7 @@ namespace Smotrel.Services
     {
         private readonly SmotrelContext _db;
         private readonly DispatcherTimer _timer;
-        private Func<(VideoModel? video, TimeSpan pos)>? _stateGetter;
+        private Func<(CourseModel? course, VideoModel? video, TimeSpan pos)>? _stateGetter;
         private VideoModel? _lastSaved;
         private TimeSpan _lastSavedPos;
 
@@ -33,7 +33,7 @@ namespace Smotrel.Services
             _timer.Tick += OnTick;
         }
 
-        public void Start(Func<(VideoModel?, TimeSpan)> stateGetter)
+        public void Start(Func<(CourseModel? course, VideoModel?, TimeSpan)> stateGetter)
         {
             _stateGetter = stateGetter;
             _timer.Start();
@@ -42,8 +42,8 @@ namespace Smotrel.Services
         private async void OnTick(object? sender, EventArgs e)
         {
             if (_stateGetter == null) return;
-            var (video, pos) = _stateGetter();
-            await TrySaveAsync(video, pos);
+            var (course, video, pos) = _stateGetter();
+            await TrySaveAsync(course, video, pos);
         }
 
         /// <summary>Вызвать явно при закрытии окна / смене видео.</summary>
@@ -51,13 +51,14 @@ namespace Smotrel.Services
         {
             _timer.Stop();
             if (_stateGetter == null) return;
-            var (video, pos) = _stateGetter();
-            await TrySaveAsync(video, pos);
+            var (course, video, pos) = _stateGetter();
+            await TrySaveAsync(course, video, pos);
         }
 
-        private async Task TrySaveAsync(VideoModel? video, TimeSpan pos)
+        private async Task TrySaveAsync(CourseModel? course, VideoModel? video, TimeSpan pos)
         {
             if (video == null) return;
+            if (course == null) return;
 
             if (_lastSaved?.Id == video.Id &&
                 Math.Abs((_lastSavedPos - pos).TotalSeconds) < 2) return;
@@ -65,7 +66,9 @@ namespace Smotrel.Services
             try
             {
                 video.LastPosition = pos;
+                course.LastVideoId = video.Id;
                 _db.Entry(video).Property(v => v.LastPosition).IsModified = true;
+                _db.Entry(course).Property(c => c.LastVideoId).IsModified = true;
                 await _db.SaveChangesAsync();
 
                 _lastSaved = video;

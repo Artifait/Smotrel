@@ -62,35 +62,25 @@
     <!-- ══════════════════════════════════════════════════════
          ScrollBar — тонкая, в стиле Discord
     ══════════════════════════════════════════════════════ -->
-    <Style TargetType="ScrollBar">
-        <Setter Property="Width"      Value="6"/>
-        <Setter Property="Background" Value="Transparent"/>
+    <Style x:Key="ScrollBarThumbStyle" TargetType="{x:Type Thumb}">
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="ScrollBar">
+                <ControlTemplate TargetType="{x:Type Thumb}">
+                    <Rectangle Fill="{StaticResource AccentDimBrush}" Margin="0 2 2 2" RadiusX="1" RadiusY="1"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type ScrollBar}">
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ScrollBar}">
                     <Grid>
-                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                        <Track Name="PART_Track" IsDirectionReversed="True" Margin="0 8 7 8">
                             <Track.Thumb>
-                                <Thumb>
-                                    <Thumb.Template>
-                                        <ControlTemplate TargetType="Thumb">
-                                            <Border Background="{StaticResource BorderNormalBrush}"
-                                                    CornerRadius="3"
-                                                    Margin="1,0">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Style.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter Property="Background"
-                                                                    Value="{StaticResource EmptyMessageBrush}"/>
-                                                            </Trigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Thumb.Template>
-                                </Thumb>
+                                <Thumb Style="{StaticResource ScrollBarThumbStyle}"/>
                             </Track.Thumb>
                         </Track>
                     </Grid>
@@ -99,30 +89,32 @@
         </Setter>
     </Style>
 
+
     <!-- ══════════════════════════════════════════════════════
          ProgressBar
     ══════════════════════════════════════════════════════ -->
     <Style TargetType="ProgressBar">
-        <Setter Property="Background"       Value="{StaticResource ButtonDarkBrush}"/>
-        <Setter Property="Foreground"       Value="{StaticResource AccentBrush}"/>
-        <Setter Property="BorderThickness"  Value="0"/>
-        <Setter Property="Height"           Value="5"/>
+        <Setter Property="Background" Value="{StaticResource ButtonDarkBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="Height" Value="5"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
-                    <Border x:Name="Root"
-                            Background="{TemplateBinding Background}"
+                    <Grid x:Name="PART_Track">
+                        <Border Background="{TemplateBinding Background}"
                             CornerRadius="2.5"
                             ClipToBounds="True">
-                        <Border x:Name="PART_Indicator"
+                            <Border x:Name="PART_Indicator"
                                 HorizontalAlignment="Left"
                                 Background="{TemplateBinding Foreground}"
                                 CornerRadius="2.5"/>
-                    </Border>
+                        </Border>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
+
 
     <!-- ══════════════════════════════════════════════════════
          ContextMenu — тёмная тема

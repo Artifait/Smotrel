@@ -94,7 +94,6 @@ namespace Smotrel.Controls
             _currentVideo = video;
             _currentPos   = TimeSpan.Zero;
 
-            // Если видео не в текущей главе — прыгаем к нужной
             if (_currentChapter != null &&
                 !_currentChapter.Videos.Any(v => v.Id == video.Id))
             {

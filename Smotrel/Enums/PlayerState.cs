@@ -1,8 +1,4 @@
 ﻿namespace Smotrel.Enums
 {
-    public enum PlayerState
-    {
-        Paused,
-        Playing,
-    }
+    public enum PlayerState { Playing, Paused }
 }

@@ -39,10 +39,29 @@ namespace Smotrel.Services
             // Шаг 2: Рекурсивно загружаем всё дерево
             LoadChapterTree(course.MainChapter);
 
+            if (course.LastVideoId.HasValue)
+                course.LastVideo = FindVideoById(course.MainChapter, course.LastVideoId.Value);
+
             // Шаг 3: Восстанавливаем [NotMapped] FilePath = Path для каждого видео
             PopulateFilePaths(course.MainChapter);
 
             return course;
+        }
+
+        private static VideoModel? FindVideoById(ChapterCourseModel chapter, int id)
+        {
+            foreach (var video in chapter.Videos)
+                if (video.Id == id)
+                    return video;
+
+            foreach (var child in chapter.Chapters)
+            {
+                var found = FindVideoById(child, id);
+                if (found != null)
+                    return found;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -59,6 +78,10 @@ namespace Smotrel.Services
             if (course?.MainChapter == null) return null;
 
             await LoadChapterTreeAsync(course.MainChapter, ct);
+
+            if (course.LastVideoId.HasValue)
+                course.LastVideo = FindVideoById(course.MainChapter, course.LastVideoId.Value);
+
             PopulateFilePaths(course.MainChapter);
 
             return course;
