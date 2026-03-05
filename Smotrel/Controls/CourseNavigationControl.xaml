@@ -228,13 +228,13 @@
                     <TextBlock Grid.Column="0"
                                Text="{Binding TimeText}"
                                Foreground="{StaticResource AccentBrush}"
-                               FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                               FontFamily="Consolas" FontSize="15" FontWeight="SemiBold"
                                VerticalAlignment="Center"/>
 
                     <TextBlock Grid.Column="1"
                                Text="{Binding Label}"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               FontFamily="Arial" FontSize="11"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontFamily="Arial" FontSize="16"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"/>
 
@@ -327,13 +327,13 @@
                     BorderThickness="0,0,0,1"
                     Padding="12,12,12,14">
                 <StackPanel>
-                    <TextBlock Text="ТЕКУЩЕЕ ВИДЕО" Style="{StaticResource SecHdr}"
+                    <TextBlock Text="ТЕКУЩЕЕ ВИДЕО" Style="{StaticResource SecHdr}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14"
                                Margin="0,0,0,8"/>
 
                     <TextBlock x:Name="TbVideoTitle"
                                Text="—"
                                Foreground="{StaticResource TextPrimaryBrush}"
-                               FontFamily="Arial" FontSize="13" FontWeight="SemiBold"
+                               FontFamily="Arial" FontSize="16" FontWeight="SemiBold"
                                TextWrapping="Wrap" Margin="0,0,0,10"/>
 
                     <Grid Margin="0,0,0,4">
@@ -380,13 +380,13 @@
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="0,7">
-                            <TextBlock Text="&#xE710;"
-                                       FontFamily="Segoe MDL2 Assets" FontSize="11"
+                            <TextBlock Text="&#xF8AA;"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="11" FontWeight="Bold"
                                        Foreground="{StaticResource EmptyMessageBrush}"
                                        VerticalAlignment="Center" Margin="0,0,6,0"/>
                             <TextBlock Text="Добавить метку"
                                        Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontFamily="Arial" FontSize="12"
+                                       FontFamily="Arial" FontSize="14"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
@@ -395,8 +395,8 @@
 
                     <TextBlock x:Name="TbNoTimecodes"
                                Text="Меток нет"
-                               Foreground="{StaticResource EmptyMessageBrush}"
-                               FontFamily="Arial" FontSize="11" FontStyle="Italic"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontFamily="Arial" FontSize="15" FontStyle="Italic"
                                HorizontalAlignment="Center"
                                Visibility="Collapsed"/>
                 </StackPanel>
@@ -405,7 +405,7 @@
             <!-- ═══ БЛОК 3: ПРОГРЕСС ГЛАВЫ ══════════════════ -->
             <Border Padding="12,12,12,18">
                 <StackPanel>
-                    <TextBlock Text="ПРОГРЕСС ГЛАВЫ" Style="{StaticResource SecHdr}"
+                    <TextBlock Text="ПРОГРЕСС ГЛАВЫ" HorizontalAlignment="Center" FontSize="14" Style="{StaticResource SecHdr}" Foreground="{StaticResource TextPrimaryBrush}"
                                Margin="0,0,0,12"/>
 
                     <TextBlock x:Name="TbChapterPct"
@@ -417,7 +417,7 @@
 
                     <TextBlock x:Name="TbChapterRatio"
                                Text="0 / 0 видео завершено"
-                               Foreground="{StaticResource EmptyMessageBrush}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
                                FontFamily="Arial" FontSize="12"
                                HorizontalAlignment="Center"
                                Margin="0,0,0,10"/>

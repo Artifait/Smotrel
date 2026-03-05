@@ -13,7 +13,7 @@
             BorderThickness="1" CornerRadius="10">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="40"/>
+                <RowDefinition Height="45"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -25,7 +25,7 @@
                 <Grid>
                     <TextBlock Text="Настройки"
                                Foreground="{StaticResource GlyphBrush}"
-                               FontFamily="Rockwell" FontSize="18"
+                               FontFamily="Rockwell" FontSize="26" FontWeight="SemiBold"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     <Button HorizontalAlignment="Right"
                             Width="40" Content="&#xE8BB;"
@@ -208,7 +208,7 @@
                             Click="SaveButton_Click"
                             Style="{StaticResource DarkButtonStyle}"
                             Foreground="{StaticResource GlyphBrush}"
-                            FontSize="14"/>
+                            FontSize="20"/>
 
                 </StackPanel>
             </ScrollViewer>

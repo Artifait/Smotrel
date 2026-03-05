@@ -1,4 +1,5 @@
 using Smotrel.Models;
+using Smotrel.Services;
 using Smotrel.ViewModels;
 using System.Collections.ObjectModel;
 using System.Windows;
@@ -258,8 +259,13 @@ namespace Smotrel.Controls
         private void RebuildTimecodes()
         {
             _timecodeVms.Clear();
+            if(_currentVideo == null) return;
 
-            if (_currentVideo == null || _currentVideo.Timestamps.Count == 0)
+            if(_currentVideo.Timestamps.Count == 0)
+            {
+                TimecodeStorage.Load(_currentVideo);
+            }
+            if (_currentVideo.Timestamps.Count == 0)
             {
                 TbNoTimecodes.Visibility = Visibility.Visible;
                 return;

@@ -40,8 +40,8 @@
                 <Grid>
                     <TextBlock Text="Добавить курс"
                                Foreground="{StaticResource GlyphBrush}"
-                               FontFamily="Rockwell" FontSize="18"
-                               HorizontalAlignment="Center"
+                               FontFamily="Rockwell" FontSize="24"
+                               HorizontalAlignment="Center" FontWeight="SemiBold"
                                VerticalAlignment="Center"/>
                     <Button HorizontalAlignment="Right"
                             Width="40" Content="&#xE8BB;"
@@ -202,7 +202,7 @@
                         Click="AddButton_Click"
                         Style="{StaticResource DarkButtonStyle}"
                         Foreground="{StaticResource GlyphBrush}"
-                        FontSize="14"/>
+                        FontSize="18"/>
 
             </StackPanel>
         </Grid>

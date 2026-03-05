@@ -127,6 +127,14 @@ namespace Smotrel.Views
                     {
                         Owner = this
                     };
+                    dlg.WindowStartupLocation = WindowStartupLocation.Manual;
+
+                    double screenWidth = SystemParameters.PrimaryScreenWidth;
+                    double screenHeight = SystemParameters.PrimaryScreenHeight;
+
+                    dlg.Left = (screenWidth - this.Width) / 2 + 530;
+                    dlg.Top = (screenHeight - this.Height) / 2 + 220;
+
                     dlg.ShowDialog();
                     if (dlg.ShouldResume)
                         startPos = video.LastPosition;
@@ -180,7 +188,7 @@ namespace Smotrel.Views
         {
             if (_currentVideo?.Id == video.Id)
             {
-                ActivePlayer.Timeline.Timecodes = video.Timestamps.Cast<ITimecode>().ToList();
+                ActivePlayer.SetTimecodes(video.Timestamps);
             }
         }
 

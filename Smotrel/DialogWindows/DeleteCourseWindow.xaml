@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Smotrel.DialogWindows"
         mc:Ignorable="d"
         Title="Delete Course" SizeToContent="WidthAndHeight"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"

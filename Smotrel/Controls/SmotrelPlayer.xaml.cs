@@ -357,8 +357,17 @@ namespace Smotrel.Controls
             UpdateSpeedMenuChecks(snap.Speed);
 
             // ── Timecodes ─────────────────────────────────────────────────
-            if (snap.Timecodes != null)
+            if (_currentVideo != null)
+            {
+                TimecodeStorage.Load(_currentVideo);         
+                Timeline.Timecodes = _currentVideo.Timestamps.Count > 0
+                    ? _currentVideo.Timestamps.Cast<ITimecode>().ToList()
+                    : snap.Timecodes ?? [];
+            }
+            else if (snap.Timecodes != null)
+            {
                 Timeline.Timecodes = snap.Timecodes;
+            }
 
             // ── Position ──────────────────────────────────────────────────
             var startPos = Clamp(snap.StartPos, TimeSpan.Zero, dur);
@@ -401,6 +410,20 @@ namespace Smotrel.Controls
         // ═══════════════════════════════════════════════════════════════════
         //  ClickableProgressBar / Timeline Events
         // ═══════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Updates the timecode list on both the progress bar and the current video model,
+        /// then immediately persists the new list to the course folder.
+        /// This is the single write-point for timecode edits.
+        /// </summary>
+        public void SetTimecodes(List<VideoTimecode> timecodes)
+        {
+            Timeline.Timecodes = timecodes.Cast<ITimecode>().ToList();
+
+            if (_currentVideo == null) return;
+            _currentVideo.Timestamps = timecodes;
+            TimecodeStorage.Save(_currentVideo);   // → {videoName}.timecodes.json
+        }
 
         /// <summary>
         /// Fired once when the user releases the thumb after dragging.
