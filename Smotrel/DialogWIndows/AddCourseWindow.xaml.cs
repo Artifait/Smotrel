@@ -108,6 +108,13 @@ namespace Smotrel.DialogWindows
         {
             InitializeComponent();
             DataContext = this;
+            Loaded += AddCourseWindow_Loaded; ;
+        }
+
+        private void AddCourseWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Left = Owner.Left + (Owner.ActualWidth - ActualWidth) / 2;
+            Top = Owner.Top + (Owner.ActualHeight - ActualHeight) / 2;
         }
 
         // ── Выбор папки и сканирование ────────────────────────────────────────

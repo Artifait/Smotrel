@@ -8,7 +8,7 @@
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
-        WindowState="Normal"
+        WindowState="Maximized"
         Background="Transparent"
         ResizeMode="CanResizeWithGrip"
         StateChanged="OnWindowStateChanged"

@@ -47,7 +47,8 @@ namespace Smotrel.Views
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            var settingsWindow = new SettingsWindow();  
+            var settingsWindow = new SettingsWindow(); 
+            settingsWindow.Owner = this;
             settingsWindow.ShowDialog();
         }
 
@@ -55,6 +56,7 @@ namespace Smotrel.Views
         private void AddMaterial_Click(object sender, RoutedEventArgs e)
         {
             var addCourseWindow = new AddCourseWindow();
+            addCourseWindow.Owner = this;
 
             var result = addCourseWindow.ShowDialog();
             if (result == true)
@@ -142,6 +144,7 @@ namespace Smotrel.Views
             if (model == null) return;
 
             var deleteCourseWindow = new DeleteCourseWindow(card);
+            deleteCourseWindow.Owner = this;
             var res = deleteCourseWindow.ShowDialog();
 
             if (res == true)

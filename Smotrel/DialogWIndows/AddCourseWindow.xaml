@@ -1,11 +1,4 @@
-﻿<!--
-    AddCourseWindow.xaml
-    ИЗМЕНЕНИЯ:
-    • Кнопка Browse: во время сканирования превращается в "Отменить"
-    • ProgressBar + процент + имя файла под кнопкой Browse
-    • Блок статистики появляется после завершения сканирования
-    • IsEnabled кнопки "Добавить" блокирован во время сканирования
--->
+﻿
 <Window x:Class="Smotrel.DialogWindows.AddCourseWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -23,7 +16,7 @@
     </Window.Resources>
     <Border Background="{StaticResource WindowBackgroundBrush}"
             BorderBrush="{StaticResource BorderBrush}"
-            BorderThickness="1" CornerRadius="10">
+            BorderThickness="2" CornerRadius="10">
         <Grid>
             <Grid.RowDefinitions>
                 <!-- Заголовок -->
@@ -200,9 +193,18 @@
                         Margin="0,20,0,0"
                         Height="38"
                         Click="AddButton_Click"
-                        Style="{StaticResource DarkButtonStyle}"
                         Foreground="{StaticResource GlyphBrush}"
-                        FontSize="18"/>
+                        FontSize="18">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource DarkButtonStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsAddEnabled}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
 
             </StackPanel>
         </Grid>

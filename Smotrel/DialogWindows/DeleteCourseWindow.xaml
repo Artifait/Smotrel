@@ -8,7 +8,7 @@
         Title="Delete Course" SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
-        AllowsTransparency="True"
+        AllowsTransparency="True"   
         Background="Transparent"
         MinWidth="320">
 

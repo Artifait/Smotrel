@@ -5,7 +5,6 @@
         Width="420" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True"
         Background="Transparent"
-        WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         KeyDown="Window_KeyDown">
 

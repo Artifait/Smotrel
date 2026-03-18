@@ -20,14 +20,34 @@ namespace Smotrel.DialogWindows
         }
 
         // ── Конструктор ───────────────────────────────────────────────────
+        private double NavWidth;
+        private double SmotrelWidth;
+        private double GapDamperHeight;
+        private double GapHeight;
+        private double SmotrelHeight;
 
-        public ResumeDialog(string videoTitle, TimeSpan lastPosition)
+        public ResumeDialog(string videoTitle, TimeSpan lastPosition, double _NavWidth, double _SmotrelWidth, double _GapDamperHeight, double _GapHeight, double _SmotrelHeight)
         {
             DataContext = this;
+
+            NavWidth = _NavWidth;
+            SmotrelWidth = _SmotrelWidth;
+            GapDamperHeight = _GapDamperHeight;
+            GapHeight = _GapHeight;
+            SmotrelHeight = _SmotrelHeight;
+
             InitializeComponent();
 
             TbVideoTitle.Text = videoTitle;
             TbResumeTime.Text = FmtTime(lastPosition);
+
+            Loaded += ResumeDialog_Loaded;
+        }
+
+        private void ResumeDialog_Loaded(object sender, RoutedEventArgs e)
+        {
+            Left = Owner.Left + NavWidth + SmotrelWidth / 2 - ActualWidth / 2;
+            Top = Owner.Top + SmotrelHeight / 2 - ActualHeight / 2;
         }
 
         // ── Навигация клавишами ───────────────────────────────────────────

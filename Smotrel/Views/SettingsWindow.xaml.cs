@@ -11,6 +11,13 @@ namespace Smotrel.Views
         {
             InitializeComponent();
             LoadValues();
+            Loaded += SettingsWindow_Loaded; ;
+        }
+
+        private void SettingsWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Left = Owner.Left + (Owner.ActualWidth - ActualWidth) / 2;
+            Top = Owner.Top + (Owner.ActualHeight - ActualHeight) / 2;
         }
 
         private void LoadValues()

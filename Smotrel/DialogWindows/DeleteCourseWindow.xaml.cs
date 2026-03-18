@@ -16,6 +16,14 @@ namespace Smotrel.DialogWindows
 
             if (deletingCard != null)
                 CourseNameText.Text = deletingCard.Label;
+
+            Loaded += DeleteCourseWindow_Loaded;
+        }
+
+        private void DeleteCourseWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Left = Owner.Left + (Owner.ActualWidth - ActualWidth) / 2;
+            Top = Owner.Top + (Owner.ActualHeight - ActualHeight) / 2;
         }
 
         private void Header_Down(object sender, MouseButtonEventArgs e)

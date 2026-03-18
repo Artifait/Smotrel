@@ -123,17 +123,13 @@ namespace Smotrel.Views
                 // Show resume dialog only when there's a meaningful saved position
                 if (video.LastPosition > TimeSpan.FromSeconds(2) && showResumeDialog)
                 {
-                    var dlg = new ResumeDialog(video.Title, video.LastPosition)
+                    var dlg = new ResumeDialog(video.Title, video.LastPosition,
+                        Nav.ActualWidth, PlayerNormal.ActualWidth, 
+                        DamperGap.ActualHeight, GapDefinition.ActualHeight,
+                        PlayerNormal.ActualHeight)
                     {
-                        Owner = this
+                        Owner = this,
                     };
-                    dlg.WindowStartupLocation = WindowStartupLocation.Manual;
-
-                    double screenWidth = SystemParameters.PrimaryScreenWidth;
-                    double screenHeight = SystemParameters.PrimaryScreenHeight;
-
-                    dlg.Left = (screenWidth - this.Width) / 2 + 530;
-                    dlg.Top = (screenHeight - this.Height) / 2 + 220;
 
                     dlg.ShowDialog();
                     if (dlg.ShouldResume)
